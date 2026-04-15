@@ -13,4 +13,3 @@ def saveMateriel(self, materiel):
         print(f"Erreur lors de l'enregistrement du materiel: {e}")
         return False
 
-
