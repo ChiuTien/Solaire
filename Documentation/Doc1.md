@@ -155,6 +155,244 @@ produit.prix = -100  # Sera rejeté
 
 ## LEÇON 2: CONNEXION AVEC SQL SERVER {#leçon-2}
 
+### Qu'est-ce qu'un serveur SQL Server?
+
+**SQL Server** est un **système de gestion de base de données** (SGBD) développé par Microsoft. Pour vous connecter à une base de données, vous devez connaître:
+
+1. **Le serveur** - L'ordinateur où se trouve SQL Server (l'adresse IP ou le nom)
+2. **La base de données** - Le nom de la BD que vous voulez utiliser
+3. **Les identifiants** - Nom d'utilisateur et mot de passe pour accéder au serveur
+
+---
+
+### Comment identifier votre serveur SQL Server?
+
+#### Si vous avez SQL Server installé localement:
+
+**Sur Windows:**
+- Ouvrez **SQL Server Management Studio (SSMS)**
+- Regardez le nom du serveur dans l'explorateur d'objets (en haut à gauche)
+- Il ressemble généralement à: `LAPTOP-XXXXX\SQLEXPRESS` ou `.\SQLEXPRESS`
+
+```
+Exemples courants:
+- (local)              = Serveur local
+- .\SQLEXPRESS        = Serveur local avec instance SQLEXPRESS
+- LAPTOP-ABC\SQLEXPRESS = Ordinateur "LAPTOP-ABC", instance "SQLEXPRESS"
+- 192.168.1.100       = Adresse IP du serveur
+- serveur.company.com = Serveur distant
+```
+
+**Comment le trouver rapidement:**
+
+1. Ouvrez SSMS
+2. Regardez le **nom du serveur** dans la barre de titre après connexion
+3. Ou allez dans le menu **Connexion → Propriétés de connexion**
+
+---
+
+### Composants de la chaîne de connexion
+
+```
+Driver={ODBC Driver 17 for SQL Server};
+Server=LAPTOP-ABC\SQLEXPRESS;
+Database=MaBaseDeDonnees;
+UID=utilisateur;
+PWD=motdepasse
+```
+
+**Explication:**
+- `Driver`: Le pilote ODBC à utiliser (17 = version récente)
+- `Server`: **Le serveur SQL Server** (ce que vous cherchez!)
+- `Database`: Le nom de la base de données
+- `UID`: Votre nom d'utilisateur (par défaut: `sa` ou votre user Windows)
+- `PWD`: Votre mot de passe
+
+---
+
+### Les différents types de serveurs
+
+#### 1️⃣ **Serveur local avec authentification Windows**
+
+```python
+# Utilise votre compte Windows pour vous connecter
+chaine_connexion = (
+    'Driver={ODBC Driver 17 for SQL Server};'
+    'Server=LAPTOP-ABC\\SQLEXPRESS;'
+    'Database=MaBaseDeDonnees;'
+    'Trusted_Connection=yes;'  # Utilise l'authentification Windows
+)
+
+connexion = pyodbc.connect(chaine_connexion)
+```
+
+**Quand l'utiliser:** Si SQL Server et votre application sont sur le même ordinateur
+
+#### 2️⃣ **Serveur local avec authentification SQL Server**
+
+```python
+# Utilise un utilisateur SQL Server (par défaut: 'sa')
+chaine_connexion = (
+    'Driver={ODBC Driver 17 for SQL Server};'
+    'Server=.\\SQLEXPRESS;'
+    'Database=MaBaseDeDonnees;'
+    'UID=sa;'
+    'PWD=MonMotDePasse123;'
+)
+
+connexion = pyodbc.connect(chaine_connexion)
+```
+
+**Quand l'utiliser:** Développement local ou test
+
+#### 3️⃣ **Serveur distant (en ligne)**
+
+```python
+# Connexion à un serveur sur le réseau ou sur Azure
+chaine_connexion = (
+    'Driver={ODBC Driver 17 for SQL Server};'
+    'Server=serveur.database.windows.net;'  # URL du serveur
+    'Database=MaBaseDeDonnees;'
+    'UID=utilisateur@serveur;'
+    'PWD=MotDePasseSecurise;'
+)
+
+connexion = pyodbc.connect(chaine_connexion)
+```
+
+**Exemples de serveurs distants:**
+- Azure SQL Database: `servername.database.windows.net`
+- Serveur réseau: `192.168.1.100` ou `serveur.company.com`
+
+---
+
+### Guide complet: Etapes pour se connecter
+
+#### **Étape 1: Connaître le nom du serveur**
+
+```python
+# Depuis SSMS, regardez ici:
+# La barre de titre après connexion affiche: "Microsoft SQL Server Management Studio   [SQL01\SQLEXPRESS - master]"
+#                                                                        ↑
+#                                                               Nom du serveur!
+
+serveur = "SQL01\\SQLEXPRESS"
+```
+
+#### **Étape 2: Connaître les identifiants**
+
+```python
+# Vous avez reçu:
+utilisateur = "sa"  # ou votre nom d'utilisateur
+motdepasse = "MonMotDePasse123"
+```
+
+#### **Étape 3: Construire la chaîne de connexion**
+
+```python
+chaine_connexion = (
+    f'Driver={{ODBC Driver 17 for SQL Server}};'
+    f'Server={serveur};'
+    f'Database=MaBaseDeDonnees;'
+    f'UID={utilisateur};'
+    f'PWD={motdepasse}'
+)
+
+print(f"Connexion avec: {chaine_connexion}")
+```
+
+#### **Étape 4: Tester la connexion**
+
+```python
+import pyodbc
+
+try:
+    connexion = pyodbc.connect(chaine_connexion)
+    print("✓ SUCCÈS! Connexion établie")
+    connexion.close()
+except pyodbc.Error as e:
+    print(f"✗ ERREUR de connexion: {e}")
+```
+
+---
+
+### Résolution des problèmes
+
+#### ❌ Erreur: "Login failed for user 'sa'"
+
+```
+Solution: Vérifiez le mot de passe
+- Assurez-vous que le mot de passe est correct
+- Vérifiez si SQL Server utilise l'authentification SQL (pas Windows)
+```
+
+#### ❌ Erreur: "Named Pipes Provider, error: 40 - Could not open connection"
+
+```
+Solution: Le serveur n'existe pas ou n'est pas accessible
+- Vérifiez le nom du serveur
+- Assurez-vous que SQL Server est en marche (Services Windows)
+- Vérifiez le pare-feu
+```
+
+#### ❌ Erreur: "Driver {ODBC Driver 17 for SQL Server} not found"
+
+```
+Solution: Installer le driver ODBC
+pip install pyodbc
+# Ou télécharger depuis Microsoft: 
+# https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
+```
+
+---
+
+### Tester rapidement votre serveur
+
+```python
+import pyodbc
+
+# Configuration
+SERVEUR = "LAPTOP-ABC\\SQLEXPRESS"  # ✏️ À adapter
+BASE = "MaBaseDeDonnees"            # ✏️ À adapter
+USER = "sa"                         # ✏️ À adapter
+PWD = "motdepasse"                  # ✏️ À adapter
+
+def tester_connexion():
+    """Teste rapidement la connexion au serveur."""
+    try:
+        chaine = (
+            f'Driver={{ODBC Driver 17 for SQL Server}};'
+            f'Server={SERVEUR};'
+            f'Database={BASE};'
+            f'UID={USER};'
+            f'PWD={PWD}'
+        )
+        
+        conn = pyodbc.connect(chaine)
+        cursor = conn.cursor()
+        
+        # Tester une requête simple
+        cursor.execute("SELECT @@VERSION")
+        version = cursor.fetchone()
+        print(f"✓ Connexion réussie!")
+        print(f"✓ Version SQL Server: {version[0]}")
+        
+        conn.close()
+        return True
+    
+    except Exception as e:
+        print(f"✗ Erreur: {e}")
+        return False
+
+# Exécuter le test
+if tester_connexion():
+    print("\n✓ Vous pouvez commencer à utiliser la connexion!")
+else:
+    print("\n✗ Vérifiez vos paramètres de connexion")
+```
+
+---
+
 ### Installation du driver SQL Server
 
 ```bash
