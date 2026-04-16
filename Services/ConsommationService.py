@@ -397,3 +397,272 @@ class ConsommationService:
         
         print(f"\n📊 Consommation totale: {consommation_totale:.2f} Wh ({consommation_totale/1000:.3f} kWh)")
         return consommation_totale
+    
+    def calculerPuissancePanneauRequise(self, consommations, heureDebut, heureFin):
+        """
+        Calcule la puissance maximale que doit fournir un panneau solaire
+        pendant un intervalle de temps donné, en tenant compte des chevauchements
+        de consommations.
+        
+        Cette fonction analyse toutes les consommations qui se produisent (au moins
+        partiellement) pendant l'intervalle [heureDebut, heureFin] et retourne
+        la puissance maximale instantanée requise.
+        
+        Exemple:
+        - Intervalle de charge: 10:00 à 14:00
+        - Consommations:
+          * 09:00-11:00: 75W (chevauchement 10:00-11:00)
+          * 10:30-13:00: 100W (chevauchement 10:30-13:00)
+          * 13:00-15:00: 50W (chevauchement 13:00-14:00)
+        
+        Puissances par sous-intervalle:
+        - 10:00-10:30: 75W
+        - 10:30-11:00: 175W ⚡ MAX
+        - 11:00-13:00: 100W
+        - 13:00-14:00: 150W
+        
+        Puissance panneau requise = 175W
+        
+        Args:
+            consommations: Liste d'objets Consommation
+            heureDebut: Heure de début de l'intervalle (str "HH:MM:SS" ou time)
+            heureFin: Heure de fin de l'intervalle (str "HH:MM:SS" ou time)
+        
+        Returns:
+            dict: Dictionnaire contenant:
+                - 'puissance_max': Puissance maximale requise en Watts
+                - 'intervalle_max': Sous-intervalle où le max est atteint
+                - 'details': Liste des détails pour chaque sous-intervalle
+        """
+        if not consommations or len(consommations) == 0:
+            print("⚠ Aucune consommation à analyser")
+            return {
+                'puissance_max': 0,
+                'intervalle_max': None,
+                'details': []
+            }
+        
+        try:
+            # Convertir les heures de l'intervalle en objets time
+            if isinstance(heureDebut, str):
+                heureDebut = datetime.strptime(heureDebut, "%H:%M:%S").time()
+            if isinstance(heureFin, str):
+                heureFin = datetime.strptime(heureFin, "%H:%M:%S").time()
+            
+            # Créer une liste d'événements pour les consommations
+            evenements = []
+            
+            for idx, consommation in enumerate(consommations):
+                puissance = consommation.puissance
+                conso_debut = consommation.heureDebut
+                conso_fin = consommation.heureFin
+                
+                # Convertir en objets time si nécessaire
+                if isinstance(conso_debut, str):
+                    conso_debut = datetime.strptime(conso_debut, "%H:%M:%S").time()
+                if isinstance(conso_fin, str):
+                    conso_fin = datetime.strptime(conso_fin, "%H:%M:%S").time()
+                
+                # Vérifier si la consommation chevauchie l'intervalle
+                # Convertir en secondes pour comparaison
+                def temps_en_secs(t):
+                    return t.hour * 3600 + t.minute * 60 + t.second
+                
+                conso_debut_secs = temps_en_secs(conso_debut)
+                conso_fin_secs = temps_en_secs(conso_fin)
+                intervalle_debut_secs = temps_en_secs(heureDebut)
+                intervalle_fin_secs = temps_en_secs(heureFin)
+                
+                # Gérer les traversées de minuit
+                traverse_minuit = conso_fin_secs < conso_debut_secs
+                
+                # Vérifier le chevauchement
+                if traverse_minuit:
+                    conso_fin_secs += 24 * 3600
+                
+                if intervalle_fin_secs < intervalle_debut_secs:
+                    intervalle_fin_secs += 24 * 3600
+                
+                # Vérifier si il y a chevauchement
+                if conso_fin_secs > intervalle_debut_secs and conso_debut_secs < intervalle_fin_secs:
+                    # Ajouter les événements
+                    evenements.append({
+                        'temps': max(conso_debut_secs, intervalle_debut_secs),
+                        'type': 'debut',
+                        'puissance': puissance
+                    })
+                    evenements.append({
+                        'temps': min(conso_fin_secs, intervalle_fin_secs),
+                        'type': 'fin',
+                        'puissance': puissance
+                    })
+            
+            # Ajouter les événements "limites" de l'intervalle
+            evenements.append({
+                'temps': temps_en_secs(heureDebut),
+                'type': 'limite_debut',
+            })
+            evenements.append({
+                'temps': temps_en_secs(heureFin),
+                'type': 'limite_fin',
+            })
+            
+            # Trier les événements
+            evenements.sort(key=lambda x: x['temps'])
+            
+            # Parcourir et calculer les puissances par intervalle
+            puissance_active = 0
+            puissance_max = 0
+            intervalle_max = None
+            details = []
+            
+            for i, evenement in enumerate(evenements):
+                if evenement['type'] == 'debut':
+                    puissance_active += evenement['puissance']
+                elif evenement['type'] == 'fin':
+                    puissance_active -= evenement['puissance']
+                
+                # Créer un intervalle jusqu'au prochain événement
+                if i < len(evenements) - 1 and evenement['type'] != 'limite_fin':
+                    temps_debut = evenement['temps']
+                    temps_fin = evenements[i + 1]['temps']
+                    
+                    if temps_fin > temps_debut:
+                        # Convertir en heure:minute:seconde
+                        heure_debut_str = f"{(temps_debut // 3600) % 24:02d}:{(temps_debut % 3600) // 60:02d}:{temps_debut % 60:02d}"
+                        heure_fin_str = f"{(temps_fin // 3600) % 24:02d}:{(temps_fin % 3600) // 60:02d}:{temps_fin % 60:02d}"
+                        
+                        detail = {
+                            'debut': heure_debut_str,
+                            'fin': heure_fin_str,
+                            'puissance': puissance_active
+                        }
+                        details.append(detail)
+                        
+                        # Mettre à jour la puissance max
+                        if puissance_active > puissance_max:
+                            puissance_max = puissance_active
+                            intervalle_max = detail
+            
+            # Afficher les résultats
+            print("\n☀️ Analyse de la puissance du panneau solaire:\n")
+            print(f"{'Début':^10} | {'Fin':^10} | {'Puissance':^12}")
+            print("─" * 50)
+            
+            for detail in details:
+                debut = detail['debut']
+                fin = detail['fin']
+                puissance = detail['puissance']
+                
+                if puissance == puissance_max and puissance_max > 0:
+                    print(f"{debut:^10} → {fin:^10} | {puissance:>10}W ⚡")
+                else:
+                    print(f"{debut:^10} → {fin:^10} | {puissance:>10}W")
+            
+            print("─" * 50)
+            print(f"\n⚡ Puissance maximale du panneau requise: {puissance_max:.2f}W")
+            if intervalle_max:
+                print(f"📍 Intervalle critique: {intervalle_max['debut']} → {intervalle_max['fin']}")
+            
+            return {
+                'puissance_max': puissance_max,
+                'intervalle_max': intervalle_max,
+                'details': details
+            }
+            
+        except AttributeError as e:
+            print(f"✗ Erreur d'accès aux attributs: {e}")
+            return {
+                'puissance_max': 0,
+                'intervalle_max': None,
+                'details': []
+            }
+        except Exception as e:
+            print(f"✗ Erreur lors du calcul: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'puissance_max': 0,
+                'intervalle_max': None,
+                'details': []
+            }
+    
+    def calculerPuissanceTotalePanneau(self, consommations, heureDebut, heureFin, puissanceChargeBatterie):
+        """
+        Calcule la puissance TOTALE que doit fournir le panneau solaire pour:
+        1. Alimenter les appareils
+        2. Charger la batterie en même temps
+        
+        Formule:
+        Puissance totale panneau = max(puissance appareils) + puissance charge batterie
+        
+        Exemple:
+        - Consommations appareils max: 175W (dans l'intervalle)
+        - Puissance pour charger batterie: 60W
+        - Puissance totale panneau: 175W + 60W = 235W
+        
+        Args:
+            consommations: Liste d'objets Consommation
+            heureDebut: Heure de début de l'intervalle (str "HH:MM:SS" ou time)
+            heureFin: Heure de fin de l'intervalle (str "HH:MM:SS" ou time)
+            puissanceChargeBatterie: Puissance pour charger la batterie en W (float)
+        
+        Returns:
+            dict: Dictionnaire contenant:
+                - 'puissance_totale': Puissance totale requise du panneau
+                - 'puissance_appareils': Puissance max des appareils
+                - 'puissance_batterie': Puissance de charge batterie
+                - 'details': Détails des calculs
+        """
+        if not consommations or len(consommations) == 0:
+            print("⚠ Aucune consommation à analyser")
+            return {
+                'puissance_totale': puissanceChargeBatterie,
+                'puissance_appareils': 0,
+                'puissance_batterie': puissanceChargeBatterie,
+                'details': None
+            }
+        
+        try:
+            # Récupérer la puissance max des appareils dans cet intervalle
+            resultat_appareils = self.calculerPuissancePanneauRequise(consommations, heureDebut, heureFin)
+            puissance_appareils_max = resultat_appareils['puissance_max']
+            
+            # Calculer la puissance totale
+            puissance_totale = puissance_appareils_max + puissanceChargeBatterie
+            
+            # Afficher les résultats
+            print("\n🔌 Calcul de la puissance TOTALE du panneau solaire\n")
+            print(f"  Intervalle: {heureDebut} → {heureFin}")
+            print(f"  Puissance max appareils    : {puissance_appareils_max:.2f}W")
+            print(f"  Puissance charge batterie  : {puissanceChargeBatterie:.2f}W")
+            print("  " + "─" * 52)
+            print(f"  Formule: Puissance totale = Appareils + Batterie")
+            print(f"  Puissance totale = {puissance_appareils_max:.2f}W + {puissanceChargeBatterie:.2f}W")
+            print(f"\n  ⚡ Puissance TOTALE panneau requise: {puissance_totale:.2f}W")
+            
+            details = {
+                'intervalle_debut': heureDebut,
+                'intervalle_fin': heureFin,
+                'puissance_appareils': puissance_appareils_max,
+                'puissance_batterie': puissanceChargeBatterie,
+                'intervalle_critique_appareils': resultat_appareils['intervalle_max']
+            }
+            
+            return {
+                'puissance_totale': puissance_totale,
+                'puissance_appareils': puissance_appareils_max,
+                'puissance_batterie': puissanceChargeBatterie,
+                'details': details
+            }
+            
+        except Exception as e:
+            print(f"✗ Erreur lors du calcul: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'puissance_totale': puissanceChargeBatterie,
+                'puissance_appareils': 0,
+                'puissance_batterie': puissanceChargeBatterie,
+                'details': None
+            }
