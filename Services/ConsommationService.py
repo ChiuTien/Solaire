@@ -587,39 +587,50 @@ class ConsommationService:
                 'details': []
             }
     
-    def calculerPuissanceTotalePanneau(self, consommations, heureDebut, heureFin, puissanceChargeBatterie):
+    def calculerPuissanceTotalePanneau(self, consommations, heureDebut, heureFin, puissanceChargeBatterie, rendement=100):
         """
         Calcule la puissance TOTALE que doit fournir le panneau solaire pour:
         1. Alimenter les appareils
         2. Charger la batterie en même temps
         
+        Tenant compte du rendement du panneau (intensité du soleil).
+        
         Formule:
-        Puissance totale panneau = max(puissance appareils) + puissance charge batterie
+        Puissance requise (utilisable) = max(puissance appareils) + puissance charge batterie
+        Puissance théorique panneau = Puissance requise / (rendement / 100)
         
         Exemple:
         - Consommations appareils max: 175W (dans l'intervalle)
         - Puissance pour charger batterie: 60W
-        - Puissance totale panneau: 175W + 60W = 235W
+        - Puissance requise: 175W + 60W = 235W
+        - Rendement: 80%
+        - Puissance théorique panneau: 235W / 0.80 = 293.75W
         
         Args:
             consommations: Liste d'objets Consommation
             heureDebut: Heure de début de l'intervalle (str "HH:MM:SS" ou time)
             heureFin: Heure de fin de l'intervalle (str "HH:MM:SS" ou time)
             puissanceChargeBatterie: Puissance pour charger la batterie en W (float)
+            rendement: Rendement du panneau en % (0-100). Défaut: 100% (rendement parfait)
         
         Returns:
             dict: Dictionnaire contenant:
-                - 'puissance_totale': Puissance totale requise du panneau
+                - 'puissance_requise': Puissance totale requise (utilisable)
+                - 'puissance_theorique': Puissance théorique du panneau (avec rendement appliqué)
                 - 'puissance_appareils': Puissance max des appareils
                 - 'puissance_batterie': Puissance de charge batterie
+                - 'rendement': Rendement appliqué
                 - 'details': Détails des calculs
         """
         if not consommations or len(consommations) == 0:
             print("⚠ Aucune consommation à analyser")
+            puissance_theorique = puissanceChargeBatterie / (rendement / 100) if rendement > 0 else puissanceChargeBatterie
             return {
-                'puissance_totale': puissanceChargeBatterie,
+                'puissance_requise': puissanceChargeBatterie,
+                'puissance_theorique': puissance_theorique,
                 'puissance_appareils': 0,
                 'puissance_batterie': puissanceChargeBatterie,
+                'rendement': rendement,
                 'details': None
             }
         
@@ -628,31 +639,47 @@ class ConsommationService:
             resultat_appareils = self.calculerPuissancePanneauRequise(consommations, heureDebut, heureFin)
             puissance_appareils_max = resultat_appareils['puissance_max']
             
-            # Calculer la puissance totale
-            puissance_totale = puissance_appareils_max + puissanceChargeBatterie
+            # Calculer la puissance requise (utilisable)
+            puissance_requise = puissance_appareils_max + puissanceChargeBatterie
+            
+            # Calculer la puissance théorique du panneau avec le rendement
+            if rendement > 0:
+                puissance_theorique = puissance_requise / (rendement / 100)
+            else:
+                puissance_theorique = float('inf')  # Rendement 0% = impossible
             
             # Afficher les résultats
             print("\n🔌 Calcul de la puissance TOTALE du panneau solaire\n")
             print(f"  Intervalle: {heureDebut} → {heureFin}")
+            print(f"  Rendement du panneau      : {rendement:.1f}%")
             print(f"  Puissance max appareils    : {puissance_appareils_max:.2f}W")
             print(f"  Puissance charge batterie  : {puissanceChargeBatterie:.2f}W")
-            print("  " + "─" * 52)
-            print(f"  Formule: Puissance totale = Appareils + Batterie")
-            print(f"  Puissance totale = {puissance_appareils_max:.2f}W + {puissanceChargeBatterie:.2f}W")
-            print(f"\n  ⚡ Puissance TOTALE panneau requise: {puissance_totale:.2f}W")
+            print("  " + "─" * 58)
+            print(f"  Formule: Puissance requise = Appareils + Batterie")
+            print(f"  Puissance requise = {puissance_appareils_max:.2f}W + {puissanceChargeBatterie:.2f}W = {puissance_requise:.2f}W")
+            print()
+            print(f"  Formule: Puissance théorique = Puissance requise / (Rendement / 100)")
+            print(f"  Puissance théorique = {puissance_requise:.2f}W / {rendement/100:.2f} = {puissance_theorique:.2f}W")
+            print(f"\n  ⚡ Puissance requise (utilisable): {puissance_requise:.2f}W")
+            print(f"  ☀️  Puissance théorique panneau:  {puissance_theorique:.2f}W")
             
             details = {
                 'intervalle_debut': heureDebut,
                 'intervalle_fin': heureFin,
                 'puissance_appareils': puissance_appareils_max,
                 'puissance_batterie': puissanceChargeBatterie,
+                'puissance_requise': puissance_requise,
+                'rendement': rendement,
+                'puissance_theorique': puissance_theorique,
                 'intervalle_critique_appareils': resultat_appareils['intervalle_max']
             }
             
             return {
-                'puissance_totale': puissance_totale,
+                'puissance_requise': puissance_requise,
+                'puissance_theorique': puissance_theorique,
                 'puissance_appareils': puissance_appareils_max,
                 'puissance_batterie': puissanceChargeBatterie,
+                'rendement': rendement,
                 'details': details
             }
             
@@ -661,8 +688,376 @@ class ConsommationService:
             import traceback
             traceback.print_exc()
             return {
-                'puissance_totale': puissanceChargeBatterie,
+                'puissance_requise': 0,
+                'puissance_theorique': 0,
                 'puissance_appareils': 0,
                 'puissance_batterie': puissanceChargeBatterie,
+                'rendement': rendement,
                 'details': None
             }
+    
+    def calculerBesoinsParPeriode(self, consommations, configJournee_matin, configJournee_apres, 
+                                   heureChargeDebut, heureChargeFin, capaciteBatterie):
+        """
+        Calcule les besoins pratiques (puissance utilisable) pour chaque période de la journée.
+        
+        Matin: Appareils + Batterie en charge
+        Après-midi: Appareils seulement
+        Soir: Batterie seule (décharge)
+        
+        Args:
+            consommations: Liste d'objets Consommation
+            configJournee_matin: ConfigJournee pour le matin
+            configJournee_apres: ConfigJournee pour l'après-midi
+            heureChargeDebut: Heure début charge batterie (str "HH:MM:SS")
+            heureChargeFin: Heure fin charge batterie (str "HH:MM:SS")
+            capaciteBatterie: Capacité batterie en Wh
+        
+        Returns:
+            dict: Dictionnaire avec besoins pour chaque période
+        """
+        try:
+            print("\n📊 CALCUL DES BESOINS PAR PÉRIODE\n")
+            
+            # 1. BESOIN MATIN: Appareils + Charge batterie
+            print("=" * 70)
+            print("🌅 PÉRIODE MATIN")
+            print("=" * 70)
+            
+            puissance_charge = (capaciteBatterie / ((datetime.strptime(heureChargeFin, "%H:%M:%S").hour - 
+                                                     datetime.strptime(heureChargeDebut, "%H:%M:%S").hour +
+                                                     (datetime.strptime(heureChargeFin, "%H:%M:%S").minute - 
+                                                      datetime.strptime(heureChargeDebut, "%H:%M:%S").minute) / 60) / 100))
+            
+            # Calcul plus simple
+            delta_minutes = (datetime.strptime(heureChargeFin, "%H:%M:%S") - 
+                           datetime.strptime(heureChargeDebut, "%H:%M:%S")).total_seconds() / 60
+            delta_heures = delta_minutes / 60
+            puissance_charge = capaciteBatterie / delta_heures if delta_heures > 0 else 0
+            
+            resultat_matin = self.calculerPuissanceTotalePanneau(
+                consommations,
+                heureChargeDebut,
+                heureChargeFin,
+                puissance_charge,
+                rendement=configJournee_matin.rendement
+            )
+            
+            besoin_matin_pratique = resultat_matin['puissance_requise']
+            print(f"\n✓ Besoin matin (pratique): {besoin_matin_pratique:.2f}W")
+            print(f"  - Appareils: {resultat_matin['puissance_appareils']:.2f}W")
+            print(f"  - Batterie: {resultat_matin['puissance_batterie']:.2f}W")
+            
+            # 2. BESOIN APRÈS-MIDI: Appareils seulement
+            print("\n" + "=" * 70)
+            print("🌤️  PÉRIODE FIN D'APRÈS-MIDI")
+            print("=" * 70)
+            
+            resultat_apres = self.calculerPuissancePanneauRequise(
+                consommations,
+                configJournee_apres.heureDebut,
+                configJournee_apres.heureFin
+            )
+            
+            besoin_apres_pratique = resultat_apres['puissance_max']
+            print(f"\n✓ Besoin fin d'après-midi (pratique): {besoin_apres_pratique:.2f}W (appareils seuls)")
+            
+            # 3. BESOIN SOIR: Batterie décharge
+            print("\n" + "=" * 70)
+            print("🌙 PÉRIODE SOIR")
+            print("=" * 70)
+            
+            print(f"\n✓ Batterie décharge durant cette période")
+            print(f"  Capacité: {capaciteBatterie:.2f} Wh")
+            
+            return {
+                'besoin_matin_pratique': besoin_matin_pratique,
+                'besoin_apres_pratique': besoin_apres_pratique,
+                'puissance_charge_batterie': puissance_charge,
+                'details': {
+                    'matin': resultat_matin['details'],
+                    'apres': resultat_apres['details']
+                }
+            }
+            
+        except Exception as e:
+            print(f"✗ Erreur lors du calcul des besoins: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'besoin_matin_pratique': 0,
+                'besoin_apres_pratique': 0,
+                'puissance_charge_batterie': 0,
+                'details': None
+            }
+    
+    def calculerPuissancePratiquePanneau(self, besoin_matin, besoin_apres):
+        """
+        Détermine la puissance pratique (utilisable) finale du panneau
+        en fonction des besoins du matin et de l'après-midi.
+        
+        Logique:
+        1. Si besoin_apres > besoin_matin × 50%: Il manque de puissance
+        2. Manque = besoin_apres - (besoin_matin × 50%)
+        3. Manque convertir = Manque × 2 (inverse des 50%)
+        4. Puissance pratique finale = besoin_matin + Manque convertir
+        
+        Args:
+            besoin_matin: Besoin pratique matin en W
+            besoin_apres: Besoin pratique après-midi en W
+        
+        Returns:
+            dict: Puissance pratique et détails du calcul
+        """
+        try:
+            print("\n" + "=" * 70)
+            print("⚡ CALCUL DE LA PUISSANCE PRATIQUE DU PANNEAU")
+            print("=" * 70)
+            
+            print(f"\nBesoin matin: {besoin_matin:.2f}W (appareils + batterie)")
+            print(f"Besoin après-midi: {besoin_apres:.2f}W (appareils seuls)")
+            
+            # Vérifier si la puissance du matin à 50% suffit
+            puissance_disponible_apres = besoin_matin * 0.50
+            print(f"\n50% de la puissance matin: {puissance_disponible_apres:.2f}W")
+            
+            if besoin_apres <= puissance_disponible_apres:
+                # 50% suffit, pas besoin d'augmenter
+                puissance_pratique_finale = besoin_matin
+                print(f"✓ 50% du matin >= après-midi")
+                print(f"  {puissance_disponible_apres:.2f}W >= {besoin_apres:.2f}W")
+                print(f"→ Puissance pratique finale: {puissance_pratique_finale:.2f}W")
+                
+                return {
+                    'puissance_pratique': puissance_pratique_finale,
+                    'logique': f"50% du matin suffit ({puissance_disponible_apres:.2f}W >= {besoin_apres:.2f}W)",
+                    'manque': 0
+                }
+            else:
+                # Manque de puissance
+                manque = besoin_apres - puissance_disponible_apres
+                manque_convertir = manque * 2  # Inverse des 50%
+                puissance_pratique_finale = besoin_matin + manque_convertir
+                
+                print(f"✗ 50% du matin < après-midi")
+                print(f"  {puissance_disponible_apres:.2f}W < {besoin_apres:.2f}W")
+                print(f"\nManque: {besoin_apres:.2f}W - {puissance_disponible_apres:.2f}W = {manque:.2f}W")
+                print(f"Convertir en théorique (÷ 0.50): {manque:.2f}W × 2 = {manque_convertir:.2f}W")
+                print(f"→ Puissance pratique finale: {besoin_matin:.2f}W + {manque_convertir:.2f}W = {puissance_pratique_finale:.2f}W")
+                
+                return {
+                    'puissance_pratique': puissance_pratique_finale,
+                    'logique': f"Besoin supplémentaire de {manque_convertir:.2f}W",
+                    'manque': manque_convertir
+                }
+                
+        except Exception as e:
+            print(f"✗ Erreur lors du calcul: {e}")
+            return {
+                'puissance_pratique': besoin_matin,
+                'logique': "Erreur",
+                'manque': 0
+            }
+    
+    def calculerPuissanceTheoriquePanneau(self, puissance_pratique, rendement_matin):
+        """
+        Convertit la puissance pratique (utilisable) en puissance théorique
+        qu'il faut ACHETER pour le panneau.
+        
+        Formule:
+        Puissance théorique = Puissance pratique / (Rendement / 100)
+        
+        Args:
+            puissance_pratique: Puissance utilizable en W
+            rendement_matin: Rendement du matin en % (40 = 40%)
+        
+        Returns:
+            dict: Puissance théorique et rendement
+        """
+        try:
+            print("\n" + "=" * 70)
+            print("☀️  CALCUL DE LA PUISSANCE THÉORIQUE DU PANNEAU À ACHETER")
+            print("=" * 70)
+            
+            rendement_decimal = rendement_matin / 100
+            puissance_theorique = puissance_pratique / rendement_decimal
+            
+            print(f"\nFormule: P_théorique = P_pratique / (Rendement / 100)")
+            print(f"P_théorique = {puissance_pratique:.2f}W / {rendement_decimal:.2f}")
+            print(f"P_théorique = {puissance_theorique:.2f}W")
+            
+            print(f"\n✓ Panneau à acheter: {puissance_theorique:.2f}W théorique")
+            print(f"  Qui produit réellement: {puissance_theorique * rendement_decimal:.2f}W (à {rendement_matin}%)")
+            
+            return {
+                'puissance_theorique': puissance_theorique,
+                'puissance_pratique': puissance_pratique,
+                'rendement': rendement_matin
+            }
+            
+        except Exception as e:
+            print(f"✗ Erreur: {e}")
+            return {
+                'puissance_theorique': 0,
+                'puissance_pratique': puissance_pratique,
+                'rendement': rendement_matin
+            }    
+    def calculerPuissanceTheoriqueBatterie(self, puissance_pratique, marge=0.50):
+        """
+        Calcule la puissance théorique (capacité à acheter) de la batterie.
+        
+        Contrairement au panneau, la batterie utilise une marge de sécurité
+        pour assurer durabilité et cycle de vie optimal.
+        
+        Formule:
+        Puissance théorique = Puissance pratique × (1 + Marge)
+        
+        Exemple avec 50% de marge:
+        - Puissance pratique: 240W
+        - Marge: 50% (0.50)
+        - P_théorique = 240W × (1 + 0.50) = 240W × 1.50 = 360W
+        
+        Args:
+            puissance_pratique: Puissance utilisable de la batterie en W
+            marge: Marge de sécurité en décimal (0.50 = 50%, 0.30 = 30%, etc.)
+        
+        Returns:
+            dict: Puissance théorique et détails
+        """
+        try:
+            print("\n" + "=" * 70)
+            print("🔋 CALCUL DE LA PUISSANCE THÉORIQUE DE LA BATTERIE À ACHETER")
+            print("=" * 70)
+            
+            puissance_theorique = puissance_pratique * (1 + marge)
+            marge_nominale = puissance_pratique * marge
+            
+            print(f"\nFormule: P_théorique = P_pratique × (1 + Marge)")
+            print(f"P_théorique = {puissance_pratique:.2f}W × (1 + {marge:.2f})")
+            print(f"P_théorique = {puissance_pratique:.2f}W × {1 + marge:.2f}")
+            print(f"P_théorique = {puissance_theorique:.2f}W")
+            
+            print(f"\n✓ Batterie à acheter: {puissance_theorique:.2f}W théorique")
+            print(f"  Puissance utilisable: {puissance_pratique:.2f}W")
+            print(f"  Marge de sécurité: {marge_nominale:.2f}W ({marge*100:.0f}%)")
+            
+            return {
+                'puissance_theorique': puissance_theorique,
+                'puissance_pratique': puissance_pratique,
+                'marge': marge,
+                'marge_nominale': marge_nominale
+            }
+            
+        except Exception as e:
+            print(f"✗ Erreur: {e}")
+            return {
+                'puissance_theorique': puissance_pratique,
+                'puissance_pratique': puissance_pratique,
+                'marge': marge,
+                'marge_nominale': 0
+            }    
+    def dimensionnerSystemeSolaire(self, consommations, configJournee_matin, configJournee_apres,
+                                    heureChargeDebut, heureChargeFin, capaciteBatterie, marge_batterie=0.50):
+        """
+        FONCTION ORCHESTRATRICE - Calcule le dimensionnement complet du système solaire.
+        
+        Elle utilise les 4 fonctions précédentes pour:
+        1. Calculer les besoins pratiques de chaque période
+        2. Déterminer la puissance pratique finale du panneau
+        3. Convertir en puissance théorique du panneau à acheter
+        4. Calculer la puissance théorique de la batterie avec marge
+        3. Convertir en puissance théorique à acheter
+        
+        Args:
+            consommations: Liste d'objets Consommation
+            configJournee_matin: ConfigJournee pour le matin (avec heureDebut, heureFin, rendement)
+            configJournee_apres: ConfigJournee pour l'après-midi (avec heureDebut, heureFin, rendement)
+            heureChargeDebut: Heure début charge batterie (str "HH:MM:SS")
+            heureChargeFin: Heure fin charge batterie (str "HH:MM:SS")
+            capaciteBatterie: Capacité batterie en Wh (puissance pratique)
+            marge_batterie: Marge de sécurité batterie (0.50 = 50%, configurable)
+        
+        Returns:
+            dict: Dimensionnement complet du système
+        """
+        try:
+            print("\n" + "🔋" * 35)
+            print("DIMENSIONNEMENT COMPLET DU SYSTÈME SOLAIRE")
+            print("🔋" * 35)
+            
+            # ÉTAPE 1: Calculer les besoins par période
+            besoins = self.calculerBesoinsParPeriode(
+                consommations,
+                configJournee_matin,
+                configJournee_apres,
+                heureChargeDebut,
+                heureChargeFin,
+                capaciteBatterie
+            )
+            
+            # ÉTAPE 2: Calculer la puissance pratique du panneau
+            puissance_pratique = self.calculerPuissancePratiquePanneau(
+                besoins['besoin_matin_pratique'],
+                besoins['besoin_apres_pratique']
+            )
+            
+            # ÉTAPE 3: Calculer la puissance théorique
+            puissance_theorique = self.calculerPuissanceTheoriquePanneau(
+                puissance_pratique['puissance_pratique'],
+                configJournee_matin.rendement
+            )
+            
+            # ÉTAPE 4: Calculer la puissance théorique batterie
+            puissance_batterie = self.calculerPuissanceTheoriqueBatterie(
+                capaciteBatterie,
+                marge_batterie
+            )
+            
+            # RÉSUMÉ FINAL
+            print("\n" + "=" * 70)
+            print("📋 RÉSUMÉ DU DIMENSIONNEMENT")
+            print("=" * 70)
+            
+            print("\n🔋 BATTERIE:")
+            print(f"  Capacité requise: {capaciteBatterie:.2f} Wh")
+            print(f"  Charge: {heureChargeDebut} → {heureChargeFin}")
+            print(f"  Puissance charge: {besoins['puissance_charge_batterie']:.2f}W")
+            print(f"  Puissance pratique: {capaciteBatterie:.2f}W")
+            print(f"  Puissance théorique (à acheter): {puissance_batterie['puissance_theorique']:.2f}W")
+            print(f"  Marge de sécurité: {puissance_batterie['marge_nominale']:.2f}W ({marge_batterie*100:.0f}%)")
+            
+            print("\n☀️  PANNEAU SOLAIRE:")
+            print(f"  Puissance pratique (utilisable): {puissance_pratique['puissance_pratique']:.2f}W")
+            print(f"  Puissance théorique (à acheter): {puissance_theorique['puissance_theorique']:.2f}W")
+            print(f"  Rendement matin: {configJournee_matin.rendement:.0f}%")
+            
+            print("\n📊 COUVERTURE PAR PÉRIODE:")
+            print(f"  Matin: {besoins['besoin_matin_pratique']:.2f}W (appareils + batterie)")
+            print(f"  Après-midi: {besoins['besoin_apres_pratique']:.2f}W (appareils à 50% rendement)")
+            print(f"  50% du panneau aux heures de pointe: {puissance_pratique['puissance_pratique'] * 0.5:.2f}W")
+            
+            if puissance_pratique['manque'] > 0:
+                print(f"  ⚠️  Besoin supplémentaire: +{puissance_pratique['manque']:.2f}W")
+            else:
+                print(f"  ✓ Puissance suffisante")
+            
+            print("\n" + "=" * 70)
+            
+            return {
+                'besoins': besoins,
+                'puissance_pratique': puissance_pratique['puissance_pratique'],
+                'puissance_theorique': puissance_theorique['puissance_theorique'],
+                'batterie_capacite': capaciteBatterie,
+                'batterie_puissance_pratique': capaciteBatterie,
+                'batterie_puissance_theorique': puissance_batterie['puissance_theorique'],
+                'batterie_marge': marge_batterie,
+                'batterie_puissance_charge': besoins['puissance_charge_batterie'],
+                'rendement_matin': configJournee_matin.rendement,
+                'logique': puissance_pratique['logique']
+            }
+            
+        except Exception as e:
+            print(f"✗ Erreur lors du dimensionnement: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
