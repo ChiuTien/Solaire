@@ -206,16 +206,18 @@ class ConsommationService:
         Calcule la puissance maximale instantanée (peak power) nécessaire pour supporter
         tous les appareils qui pourraient fonctionner simultanément.
         
+        CORRIGÉ: Gère correctement les horaires cross-midnight (19:00 → 06:00)
+        
         Cette fonction divise la journée en intervalles de temps basés sur les horaires
         des consommations, puis détermine la puissance nécessaire à chaque moment.
         
         Exemple:
-        - Consommation 1: 70W de 22:00 à 24:00
+        - Consommation 1: 70W de 22:00 à 06:00
         - Consommation 2: 100W de 22:00 à 23:00
         
         Intervalles:
         - 22:00 à 23:00: 70W + 100W = 170W (simultanément)
-        - 23:00 à 24:00: 70W (seul)
+        - 23:00 à 06:00: 70W (seul)
         
         Puissance max = 170W (capacité minimale requise pour la batterie)
         
@@ -237,34 +239,53 @@ class ConsommationService:
             }
         
         try:
-            # Créer une liste de tous les événements (début et fin de chaque consommation)
+            from datetime import datetime, timedelta, time
+            
+            # Créer une liste de tous les événements avec dates (pour gérer cross-midnight)
             evenements = []
             
             for consommation in consommations:
                 puissance = consommation.puissance
-                heure_debut = consommation.heureDebut
-                heure_fin = consommation.heureFin
+                heure_debut_str = consommation.heureDebut
+                heure_fin_str = consommation.heureFin
                 
-                # Convertir les heures en objets time si elles sont des chaînes
-                if isinstance(heure_debut, str):
-                    heure_debut = datetime.strptime(heure_debut, "%H:%M:%S").time()
-                if isinstance(heure_fin, str):
-                    heure_fin = datetime.strptime(heure_fin, "%H:%M:%S").time()
+                # Gérer les deux formats: string ET time object
+                if isinstance(heure_debut_str, str):
+                    dt_debut = datetime.strptime(heure_debut_str, "%H:%M:%S")
+                elif isinstance(heure_debut_str, time):
+                    dt_debut = datetime.combine(datetime.today().date(), heure_debut_str)
+                else:
+                    dt_debut = heure_debut_str
                 
-                # Ajouter les événements
+                if isinstance(heure_fin_str, str):
+                    dt_fin = datetime.strptime(heure_fin_str, "%H:%M:%S")
+                elif isinstance(heure_fin_str, time):
+                    dt_fin = datetime.combine(datetime.today().date(), heure_fin_str)
+                else:
+                    dt_fin = heure_fin_str
+                
+                # Si heure_fin < heure_debut, c'est cross-midnight
+                if dt_fin < dt_debut:
+                    dt_fin = dt_fin + timedelta(days=1)
+                
+                # Ajouter les événements avec datetime
                 evenements.append({
-                    'temps': heure_debut,
+                    'datetime': dt_debut,
                     'type': 'debut',
-                    'puissance': puissance
+                    'puissance': puissance,
+                    'debut_str': str(heure_debut_str),
+                    'fin_str': str(heure_fin_str)
                 })
                 evenements.append({
-                    'temps': heure_fin,
+                    'datetime': dt_fin,
                     'type': 'fin',
-                    'puissance': puissance
+                    'puissance': puissance,
+                    'debut_str': str(heure_debut_str),
+                    'fin_str': str(heure_fin_str)
                 })
             
-            # Trier les événements par heure
-            evenements.sort(key=lambda x: x['temps'])
+            # Trier les événements par datetime (maintenant les cross-midnight sont au bon ordre)
+            evenements.sort(key=lambda x: x['datetime'])
             
             # Parcourir les événements et calculer la puissance à chaque intervalle
             puissance_actuelle = 0
@@ -280,12 +301,16 @@ class ConsommationService:
                 
                 # Enregistrer l'intervalle jusqu'au prochain événement
                 if i < len(evenements) - 1:
-                    heure_debut = evenement['temps']
-                    heure_fin = evenements[i + 1]['temps']
+                    dt_debut = evenement['datetime']
+                    dt_fin = evenements[i + 1]['datetime']
+                    
+                    # Formater les heures pour l'affichage
+                    heure_debut_affiche = dt_debut.strftime("%H:%M:%S")
+                    heure_fin_affiche = dt_fin.strftime("%H:%M:%S")
                     
                     detail = {
-                        'debut': heure_debut.strftime("%H:%M:%S"),
-                        'fin': heure_fin.strftime("%H:%M:%S"),
+                        'debut': heure_debut_affiche,
+                        'fin': heure_fin_affiche,
                         'puissance': puissance_actuelle
                     }
                     details.append(detail)
@@ -308,7 +333,8 @@ class ConsommationService:
                     print(f"   {debut} → {fin}: {puissance_display}W")
             
             print(f"\n⚡ Puissance maximale instantanée requise: {puissance_max}W")
-            print(f"📍 Intervalle critique: {intervalle_max['debut']} → {intervalle_max['fin']}")
+            if intervalle_max:
+                print(f"📍 Intervalle critique: {intervalle_max['debut']} → {intervalle_max['fin']}")
             
             return {
                 'puissance_max': puissance_max,
