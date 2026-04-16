@@ -5,6 +5,7 @@ DELETE FROM Consommation;
 DELETE FROM Ressource;
 DELETE FROM Materiel;
 DELETE FROM Statut;
+DELETE FROM ChargeBatterie;
 
 -- 2. Réinitialiser l'auto-incrément à 2
 -- Note : Le prochain insert sera la valeur spécifiée + l'incrément.
@@ -15,3 +16,4 @@ DBCC CHECKIDENT ('Ressource', RESEED, 0);
 DBCC CHECKIDENT ('ConfigJournee', RESEED, 0);
 DBCC CHECKIDENT ('Resultat', RESEED, 0);
 DBCC CHECKIDENT ('Statut', RESEED, 0);
+DBCC CHECKIDENT ('ChargeBatterie', RESEED, 0);
