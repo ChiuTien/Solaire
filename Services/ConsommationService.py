@@ -701,14 +701,17 @@ class ConsommationService:
         """
         Calcule les besoins pratiques (puissance utilisable) pour chaque période de la journée.
         
-        Matin: Appareils + Batterie en charge
-        Après-midi: Appareils seulement
+        Matin: Appareils (période entière) + Batterie en charge (fenêtre spécifique)
+        Après-midi: Appareils (période entière)
         Soir: Batterie seule (décharge)
+        
+        ⚠️ IMPORTANT: On analyse les périodes ENTIÈRES pour trouver les appareils,
+        mais la batterie ne charge que durant heureChargeDebut → heureChargeFin.
         
         Args:
             consommations: Liste d'objets Consommation
-            configJournee_matin: ConfigJournee pour le matin
-            configJournee_apres: ConfigJournee pour l'après-midi
+            configJournee_matin: ConfigJournee pour le matin (heureDebut, heureFin, rendement)
+            configJournee_apres: ConfigJournee pour l'après-midi (heureDebut, heureFin, rendement)
             heureChargeDebut: Heure début charge batterie (str "HH:MM:SS")
             heureChargeFin: Heure fin charge batterie (str "HH:MM:SS")
             capaciteBatterie: Capacité batterie en Wh
@@ -719,50 +722,69 @@ class ConsommationService:
         try:
             print("\n📊 CALCUL DES BESOINS PAR PÉRIODE\n")
             
-            # 1. BESOIN MATIN: Appareils + Charge batterie
-            print("=" * 70)
-            print("🌅 PÉRIODE MATIN")
-            print("=" * 70)
-            
-            puissance_charge = (capaciteBatterie / ((datetime.strptime(heureChargeFin, "%H:%M:%S").hour - 
-                                                     datetime.strptime(heureChargeDebut, "%H:%M:%S").hour +
-                                                     (datetime.strptime(heureChargeFin, "%H:%M:%S").minute - 
-                                                      datetime.strptime(heureChargeDebut, "%H:%M:%S").minute) / 60) / 100))
-            
-            # Calcul plus simple
+            # Calculer la puissance de charge batterie
             delta_minutes = (datetime.strptime(heureChargeFin, "%H:%M:%S") - 
                            datetime.strptime(heureChargeDebut, "%H:%M:%S")).total_seconds() / 60
             delta_heures = delta_minutes / 60
             puissance_charge = capaciteBatterie / delta_heures if delta_heures > 0 else 0
             
-            resultat_matin = self.calculerPuissanceTotalePanneau(
+            # ============================================================
+            # 1. BESOIN MATIN: Appareils (période entière) + Batterie (fenêtre charge)
+            # ============================================================
+            print("=" * 70)
+            print("🌅 PÉRIODE MATIN")
+            print("=" * 70)
+            print(f"\nPériode: {configJournee_matin.heureDebut} → {configJournee_matin.heureFin}")
+            print(f"Charge batterie: {heureChargeDebut} → {heureChargeFin}")
+            
+            # Besoin 1: Appareils uniquement durant toute la période matin
+            resultat_appareils_matin = self.calculerPuissancePanneauRequise(
+                consommations,
+                configJournee_matin.heureDebut.strftime("%H:%M:%S") if hasattr(configJournee_matin.heureDebut, 'strftime') 
+                else str(configJournee_matin.heureDebut),
+                configJournee_matin.heureFin.strftime("%H:%M:%S") if hasattr(configJournee_matin.heureFin, 'strftime')
+                else str(configJournee_matin.heureFin)
+            )
+            puissance_appareils_matin = resultat_appareils_matin['puissance_max']
+            
+            # Besoin 2: Appareils + Batterie durant la fenêtre de charge
+            resultat_appareils_charge = self.calculerPuissancePanneauRequise(
                 consommations,
                 heureChargeDebut,
-                heureChargeFin,
-                puissance_charge,
-                rendement=configJournee_matin.rendement
+                heureChargeFin
             )
+            puissance_appareils_charge = resultat_appareils_charge['puissance_max']
+            puissance_appareils_batterie = puissance_appareils_charge + puissance_charge
             
-            besoin_matin_pratique = resultat_matin['puissance_requise']
-            print(f"\n✓ Besoin matin (pratique): {besoin_matin_pratique:.2f}W")
-            print(f"  - Appareils: {resultat_matin['puissance_appareils']:.2f}W")
-            print(f"  - Batterie: {resultat_matin['puissance_batterie']:.2f}W")
+            # Le besoin du matin = MAX(appareils seuls, appareils + batterie)
+            besoin_matin_pratique = max(puissance_appareils_matin, puissance_appareils_batterie)
             
+            print(f"\n✓ Puissance appareils période matin: {puissance_appareils_matin:.2f}W")
+            print(f"✓ Puissance appareils + batterie (fenêtre charge): {puissance_appareils_batterie:.2f}W")
+            print(f"✓ Besoin matin (pratique): {besoin_matin_pratique:.2f}W")
+            
+            # ============================================================
             # 2. BESOIN APRÈS-MIDI: Appareils seulement
+            # ============================================================
             print("\n" + "=" * 70)
             print("🌤️  PÉRIODE FIN D'APRÈS-MIDI")
             print("=" * 70)
+            print(f"\nPériode: {configJournee_apres.heureDebut} → {configJournee_apres.heureFin}")
             
             resultat_apres = self.calculerPuissancePanneauRequise(
                 consommations,
-                configJournee_apres.heureDebut,
-                configJournee_apres.heureFin
+                configJournee_apres.heureDebut.strftime("%H:%M:%S") if hasattr(configJournee_apres.heureDebut, 'strftime')
+                else str(configJournee_apres.heureDebut),
+                configJournee_apres.heureFin.strftime("%H:%M:%S") if hasattr(configJournee_apres.heureFin, 'strftime')
+                else str(configJournee_apres.heureFin)
             )
             
             besoin_apres_pratique = resultat_apres['puissance_max']
             print(f"\n✓ Besoin fin d'après-midi (pratique): {besoin_apres_pratique:.2f}W (appareils seuls)")
             
+            # ============================================================
             # 3. BESOIN SOIR: Batterie décharge
+            # ============================================================
             print("\n" + "=" * 70)
             print("🌙 PÉRIODE SOIR")
             print("=" * 70)
@@ -775,7 +797,7 @@ class ConsommationService:
                 'besoin_apres_pratique': besoin_apres_pratique,
                 'puissance_charge_batterie': puissance_charge,
                 'details': {
-                    'matin': resultat_matin['details'],
+                    'matin': resultat_appareils_matin['details'],
                     'apres': resultat_apres['details']
                 }
             }
