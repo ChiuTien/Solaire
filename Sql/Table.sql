@@ -27,7 +27,7 @@ CREATE TABLE ConfigJournee (
     id INT PRIMARY KEY IDENTITY(1,1),
     heureDebut TIME,
     heureFin TIME,
-    rendement INT,
+    rendement DECIMAL(10,2),
     idStatut INT
 );
 
