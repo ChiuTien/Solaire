@@ -3,5 +3,5 @@ FROM sys.dm_exec_sessions
 WHERE database_id = DB_ID('model');
 GO
 
-KILL 53;
+KILL 55;
 GO
