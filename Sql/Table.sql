@@ -43,3 +43,11 @@ CREATE TABLE Statut (
     id INT PRIMARY KEY IDENTITY(1,1),
     nom VARCHAR(100)
 );
+
+CREATE TABLE ChargeBatterie(
+    id INT PRIMARY KEY IDENTITY(1,1),
+    heureDebut TIME,
+    heureFin TIME,
+    Capacite  FLOAT,
+    PuisanceNecessaire FLOAT
+);
