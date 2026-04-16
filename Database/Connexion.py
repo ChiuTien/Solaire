@@ -6,7 +6,7 @@ class Connexion:
         self.db = db
 
         url = (f'mssql+pyodbc://{user}:{password}@'
-                f'{serve}/{db}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes'
+                f'{serve}/{db}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes'
                 )
 
         self.engine = create_engine(url)
