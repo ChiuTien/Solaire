@@ -1,369 +1,161 @@
 #!/usr/bin/env python3
-"""
-Validation par le code des fonctions de ConsommationService:
-- calculerCapaciteBatterieRequise
-- calculerPuissanceMaxSimultanee
-- calculerConsommationTotale
-
-Ce script utilise MaterielService et ConsommationService avec des repositories
-en memoire (pas de base SQL necessaire) pour prouver les resultats.
-"""
+"""Seed de donnees et tests du service de consommation pour Solaris."""
 
 from math import isclose
 
+from Database.Connexion import Connexion
+from Models.ConfigJournee import ConfigJournee
 from Models.Consommation import Consommation
 from Models.Materiel import Materiel
+from Models.Ressource import Ressource
+from Models.Resultat import Resultat
+from Models.Statut import Statut
+from Repositories.ConfigJourneeRepository import ConfigJourneeRepository
+from Repositories.ConsommationRepository import ConsommationRepository
+from Repositories.MaterielRepository import MaterielRepository
+from Repositories.RessourceRepository import RessourceRepository
+from Repositories.ResultatRepository import ResultatRepository
+from Repositories.StatutRepository import StatutRepository
 from Services.ConsommationService import ConsommationService
-from Services.MaterielService import MaterielService
+from sqlalchemy import text
 
 
-class InMemoryMaterielRepository:
-    """Repository materiel minimal en memoire pour les tests."""
-
-    def __init__(self):
-        self._rows = []
-        self._next_id = 1
-
-    def saveMateriel(self, materiel):
-        materiel.id = self._next_id
-        self._next_id += 1
-        self._rows.append((materiel.id, materiel.nom))
-        return True
-
-    def findAll(self):
-        return list(self._rows)
-
-    def findById(self, id_materiel):
-        for row in self._rows:
-            if row[0] == id_materiel:
-                return row
-        return None
-
-    def findByNom(self, nom):
-        return [row for row in self._rows if nom.lower() in row[1].lower()]
-
-    def update(self, id_materiel, nom=None):
-        for i, row in enumerate(self._rows):
-            if row[0] == id_materiel:
-                self._rows[i] = (id_materiel, nom or row[1])
-                return True
-        return False
-
-    def delete(self, id_materiel):
-        for i, row in enumerate(self._rows):
-            if row[0] == id_materiel:
-                del self._rows[i]
-                return True
-        return False
-
-    def count(self):
-        return len(self._rows)
-
-
-class DummyConsommationRepository:
-    """Stub pour instancier ConsommationService sans DB."""
-
-    def save(self, consommation):
-        return True
-
-    def findAll(self):
-        return []
-
-    def findById(self, id_consommation):
-        return None
-
-    def findByMateriel(self, idMateriel):
-        return []
-
-    def update(self, id_consommation, idMateriel=None, puissance=None, heureDebut=None, heureFin=None):
-        return True
-
-    def delete(self, id_consommation):
-        return True
-
-    def count(self):
-        return 0
-
-
-def build_services_with_materiels():
-    """Cree MaterielService + ConsommationService et ajoute des materiels de test."""
-    materiel_service = MaterielService(InMemoryMaterielRepository())
-    consommation_service = ConsommationService(DummyConsommationRepository())
-
-    noms = [
-        "TV",
-        "Phone",
-        "PC",
-        "Frigo",
-        "Routeur",
-        "Pompe",
-        "Lampe",
+def reset_tables(connexion):
+    """Vide les tables pour rendre le seed rejouable."""
+    tables = [
+        "Resultat",
+        "ConfigJournee",
+        "Consommation",
+        "Ressource",
+        "Materiel",
+        "Statut",
     ]
-    for nom in noms:
-        materiel_service.saveMateriel(Materiel(nom=nom))
-
-    return materiel_service, consommation_service
-
-
-def run_case_capacite(consommation_service, case_name, consommations, expected_total_wh):
-    result = consommation_service.calculerCapaciteBatterieRequise(consommations)
-    ok = isclose(result["capacite_totale"], expected_total_wh, rel_tol=1e-9, abs_tol=1e-6)
-    if not ok:
-        raise AssertionError(
-            f"[{case_name}] capacite_totale attendue={expected_total_wh}, obtenue={result['capacite_totale']}"
-        )
-    print(f"PASS capacite: {case_name} -> {result['capacite_totale']:.2f} Wh")
+    for table in tables:
+        connexion.connection.execute(text(f"DELETE FROM {table}"))
+    connexion.connection.commit()
 
 
-def run_case_puissance_max(consommation_service, case_name, consommations, expected_max):
-    result = consommation_service.calculerPuissanceMaxSimultanee(consommations)
-    ok = isclose(result["puissance_max"], expected_max, rel_tol=1e-9, abs_tol=1e-6)
-    if not ok:
-        raise AssertionError(
-            f"[{case_name}] puissance_max attendue={expected_max}, obtenue={result['puissance_max']}"
-        )
-    print(f"PASS puissance max: {case_name} -> {result['puissance_max']:.2f} W")
+def seed_data(connexion):
+    """Insere les donnees de base dans la base Solaris."""
+    materiel_repo = MaterielRepository(connexion)
+    consommation_repo = ConsommationRepository(connexion)
+    ressource_repo = RessourceRepository(connexion)
+    statut_repo = StatutRepository(connexion)
+    config_repo = ConfigJourneeRepository(connexion)
+    resultat_repo = ResultatRepository(connexion)
+
+    print("[INSERT] Creation des materiels...")
+    materiel_repo.saveMateriel(Materiel("Panneau solaire"))
+    materiel_repo.saveMateriel(Materiel("Batterie"))
+
+    print("[INSERT] Creation des consommations...")
+    consommation_repo.save(Consommation(None, 1, 6, "06:00:00", "19:00:00"))
+    consommation_repo.save(Consommation(None, 1, 9, "19:00:00", "06:00:00"))
+    consommation_repo.save(Consommation(None, 2, 2, "20:00:00", "08:00:00"))
+
+    print("[INSERT] Creation des ressources...")
+    ressource_repo.save(Ressource(None, "Panneau solaire", 100.0, 40.0))
+    ressource_repo.save(Ressource(None, "Batterie", 100.0, 150.0))
+
+    print("[INSERT] Creation des statuts...")
+    statut_repo.save(Statut(None, "matin"))
+    statut_repo.save(Statut(None, "midi"))
+    statut_repo.save(Statut(None, "soir"))
+
+    print("[INSERT] Creation des configurations de journee...")
+    config_repo.save(ConfigJournee(None, "06:00:00", "19:00:00", 0.40, 1))
+    config_repo.save(ConfigJournee(None, "19:00:00", "06:00:00", 0.50, 2))
+    config_repo.save(ConfigJournee(None, "20:00:00", "08:00:00", 1.50, 3))
+
+    print("[INSERT] Creation des resultats...")
+    resultat_repo.save(Resultat(None, 1, 1))
+    resultat_repo.save(Resultat(None, 2, 1))
+    resultat_repo.save(Resultat(None, 3, 2))
+
+    return {
+        "materiel_repo": materiel_repo,
+        "consommation_repo": consommation_repo,
+        "ressource_repo": ressource_repo,
+        "statut_repo": statut_repo,
+        "config_repo": config_repo,
+        "resultat_repo": resultat_repo,
+    }
 
 
-def run_case_conso_totale(consommation_service, case_name, consommations, expected_wh):
-    result = consommation_service.calculerConsommationTotale(consommations)
-    ok = isclose(result, expected_wh, rel_tol=1e-9, abs_tol=1e-6)
-    if not ok:
-        raise AssertionError(
-            f"[{case_name}] consommation_totale attendue={expected_wh}, obtenue={result}"
-        )
-    print(f"PASS conso totale: {case_name} -> {result:.2f} Wh")
+def charger_consommations(repo):
+    """Convertit les lignes SQL en objets Consommation pour le service."""
+    lignes = repo.findAll() or []
+    return [Consommation(id_ligne[0], id_ligne[1], id_ligne[2], id_ligne[3], id_ligne[4]) for id_ligne in lignes]
 
 
-def get_test_data_calculer_capacite_batterie():
-    """
-    Retourne des jeux de donnees de test prets a utiliser.
+def tester_calculs(service):
+    """Execute des tests simples sur les fonctions de calcul du service."""
+    consommations = [
+        Consommation(None, 1, 10, "08:00:00", "12:00:00"),
+        Consommation(None, 1, 20, "10:00:00", "13:00:00"),
+        Consommation(None, 2, 15, "11:00:00", "14:00:00"),
+    ]
 
-    Chaque scenario contient:
-    - name: nom du cas
-    - description: explication
-    - consommations: liste d'objets Consommation
-    """
-    scenarios = []
+    print("\n[TEST] calculerConsommationTotale")
+    consommation_totale = service.calculerConsommationTotale(consommations)
+    print(f"Resultat attendu: 145.0 Wh, obtenu: {consommation_totale:.2f} Wh")
+    assert isclose(consommation_totale, 145.0, rel_tol=1e-9), "Consommation totale incorrecte"
 
-    # Cas 1: donnee PM simple -> 120W * 1.5h = 180Wh
-    scenarios.append({
-        "name": "cas_pm_simple",
-        "description": "Consommation simple en PM.",
-        "consommations": [
-            Consommation(id=None, idMateriel=1, puissance=120, heureDebut="20:30:00", heureFin="22:00:00"),
-        ],
-        "expected": {
-            "capacite_totale_wh": 180.0
-        }
-    })
+    print("\n[TEST] calculerCapaciteBatterieRequise")
+    batterie = service.calculerCapaciteBatterieRequise(consommations)
+    capacite_totale = batterie["capacite_totale"]
+    print(f"Resultat attendu: 145.0 Wh, obtenu: {capacite_totale:.2f} Wh")
+    assert isclose(capacite_totale, 145.0, rel_tol=1e-9), "Capacite batterie incorrecte"
 
-    # Cas 2: chevauchement classique
-    # 06-07:100 + 07-08:145 + 08-09:95 + 09-10:50 = 390Wh
-    scenarios.append({
-        "name": "chevauchement_max",
-        "description": "Chevauchements multiples.",
-        "consommations": [
-            Consommation(id=None, idMateriel=1, puissance=100, heureDebut="06:00:00", heureFin="08:00:00"),
-            Consommation(id=None, idMateriel=2, puissance=45, heureDebut="07:00:00", heureFin="09:00:00"),
-            Consommation(id=None, idMateriel=1, puissance=50, heureDebut="07:00:00", heureFin="10:00:00"),
-        ],
-        "expected": {
-            "capacite_totale_wh": 390.0
-        }
-    })
+    print("\n[TEST] calculerPuissanceMaxSimultanee")
+    puissance_max = service.calculerPuissanceMaxSimultanee(consommations)
+    puissance_max_valeur = puissance_max["puissance_max"]
+    print(f"Resultat attendu: 45 W, obtenu: {puissance_max_valeur} W")
+    assert puissance_max_valeur == 45, "Puissance max simultanee incorrecte"
 
-    # Cas 3: traverser minuit
-    # 22:00-23:30:70W (1.5h=105Wh)
-    # 23:30-01:30:110W (2h=220Wh)
-    # 01:30-04:00:40W (2.5h=100Wh)
-    # Total=425Wh
-    scenarios.append({
-        "name": "traverse_minuit",
-        "description": "Charge qui traverse minuit avec chevauchement.",
-        "consommations": [
-            Consommation(id=None, idMateriel=6, puissance=70, heureDebut="22:00:00", heureFin="01:30:00"),
-            Consommation(id=None, idMateriel=7, puissance=40, heureDebut="23:30:00", heureFin="04:00:00"),
-        ],
-        "expected": {
-            "capacite_totale_wh": 425.0
-        }
-    })
+    print("\n[TEST] calculerPuissancePanneauRequise")
+    panneau = service.calculerPuissancePanneauRequise(consommations, "09:00:00", "13:00:00")
+    puissance_panneau = panneau["puissance_max"]
+    print(f"Resultat attendu: 45 W, obtenu: {puissance_panneau} W")
+    assert puissance_panneau == 45, "Puissance panneau requise incorrecte"
 
-    # Cas 4: donnees vides
-    scenarios.append({
-        "name": "vide",
-        "description": "Aucune consommation.",
-        "consommations": [],
-        "expected": {
-            "capacite_totale_wh": 0.0
-        }
-    })
+    print("\n[TEST] calculerPuissanceTotalePanneau")
+    panneau_total = service.calculerPuissanceTotalePanneau(consommations, "09:00:00", "13:00:00", 5)
+    puissance_totale = panneau_total["puissance_totale"]
+    print(f"Resultat attendu: 50 W, obtenu: {puissance_totale} W")
+    assert puissance_totale == 50, "Puissance totale panneau incorrecte"
 
-    return scenarios
+    print("\n[OK] Tous les tests de calcul sont passes.")
 
 
-def get_test_data_puissance_max_simultanee():
-    """
-    Jeux de donnees pour calculerPuissanceMaxSimultanee.
+def main():
+    print("\n[CONNEXION] Etablissement de la connexion...")
+    db_connexion = Connexion(
+        serve="127.0.0.1,1433",
+        db="Solaris",
+        user="sa",
+        password="MotDePasseFort123!",
+    )
+    db_connexion.connect()
+    connexion = db_connexion.connection
 
-    Les champs expected servent de repere pour verifier rapidement le resultat.
-    """
-    scenarios = []
+    print("[RESET] Nettoyage des donnees existantes...")
+    reset_tables(db_connexion)
 
-    scenarios.append({
-        "name": "simple_sans_chevauchement",
-        "description": "Consommations successives, puissance max = plus grande charge unique.",
-        "consommations": [
-            Consommation(id=None, idMateriel=21, puissance=60, heureDebut="08:00:00", heureFin="09:00:00"),
-            Consommation(id=None, idMateriel=22, puissance=90, heureDebut="09:00:00", heureFin="10:00:00"),
-        ],
-        "expected": {
-            "puissance_max": 90
-        }
-    })
+    repositories = seed_data(connexion)
+    consommation_service = ConsommationService(repositories["consommation_repo"])
+    print("\n[RESUME]")
+    print(f"  - Materiels: {repositories['materiel_repo'].count()}")
+    print(f"  - Consommations: {repositories['consommation_repo'].count()}")
+    print(f"  - Ressources: {repositories['ressource_repo'].count()}")
+    print(f"  - Statuts: {repositories['statut_repo'].count()}")
+    print(f"  - ConfigJournee: {repositories['config_repo'].count()}")
+    print(f"  - Resultats: {repositories['resultat_repo'].count()}")
 
-    scenarios.append({
-        "name": "chevauchement_fort",
-        "description": "Chevauchement de plusieurs charges pour observer le pic de puissance.",
-        "consommations": [
-            Consommation(id=None, idMateriel=23, puissance=100, heureDebut="06:00:00", heureFin="08:00:00"),
-            Consommation(id=None, idMateriel=24, puissance=45, heureDebut="07:00:00", heureFin="09:00:00"),
-            Consommation(id=None, idMateriel=25, puissance=50, heureDebut="07:00:00", heureFin="10:00:00"),
-        ],
-        "expected": {
-            "puissance_max": 195
-        }
-    })
+    tester_calculs(consommation_service)
 
-    scenarios.append({
-        "name": "avec_pm",
-        "description": "Consommations de soiree incluant un chevauchement court.",
-        "consommations": [
-            Consommation(id=None, idMateriel=26, puissance=120, heureDebut="20:00:00", heureFin="22:00:00"),
-            Consommation(id=None, idMateriel=27, puissance=80, heureDebut="21:00:00", heureFin="21:30:00"),
-        ],
-        "expected": {
-            "puissance_max": 200
-        }
-    })
-
-    scenarios.append({
-        "name": "vide",
-        "description": "Aucune consommation.",
-        "consommations": [],
-        "expected": {
-            "puissance_max": 0
-        }
-    })
-
-    return scenarios
-
-
-def get_test_data_consommation_totale():
-    """
-    Jeux de donnees pour calculerConsommationTotale.
-
-    energy_wh est calculee manuellement: puissance * duree(heures).
-    """
-    scenarios = []
-
-    scenarios.append({
-        "name": "base_jour",
-        "description": "Trois charges simples dans la journee.",
-        "consommations": [
-            Consommation(id=None, idMateriel=31, puissance=75, heureDebut="19:00:00", heureFin="21:00:00"),
-            Consommation(id=None, idMateriel=32, puissance=100, heureDebut="22:00:00", heureFin="23:00:00"),
-            Consommation(id=None, idMateriel=33, puissance=200, heureDebut="00:00:00", heureFin="02:00:00"),
-        ],
-        "expected": {
-            "consommation_totale_wh": 650.0
-        }
-    })
-
-    scenarios.append({
-        "name": "traverse_minuit",
-        "description": "Une charge traverse minuit (22:00->06:00).",
-        "consommations": [
-            Consommation(id=None, idMateriel=34, puissance=70, heureDebut="22:00:00", heureFin="06:00:00"),
-        ],
-        "expected": {
-            "consommation_totale_wh": 560.0
-        }
-    })
-
-    scenarios.append({
-        "name": "format_heure_standard",
-        "description": "Heures au format HH:MM:SS conforme au service actuel.",
-        "consommations": [
-            Consommation(id=None, idMateriel=35, puissance=120, heureDebut="09:15:00", heureFin="10:45:00"),
-        ],
-        "expected": {
-            "consommation_totale_wh": 180.0
-        }
-    })
-
-    scenarios.append({
-        "name": "vide",
-        "description": "Aucune consommation.",
-        "consommations": [],
-        "expected": {
-            "consommation_totale_wh": 0.0
-        }
-    })
-
-    return scenarios
-
-
-def print_test_data():
-    """Execute les fonctions du service et valide les resultats."""
-
-    materiel_service, consommation_service = build_services_with_materiels()
-
-    print("=" * 72)
-    print("VALIDATION MATERIELSERVICE")
-    print("=" * 72)
-    print(f"Materiels enregistres: {materiel_service.count()}")
-    for row in materiel_service.findAll():
-        print(f"  - id={row[0]}, nom={row[1]}")
-
-    print("\n" + "=" * 72)
-    print("VALIDATION calculerCapaciteBatterieRequise")
-    print("=" * 72)
-    for scenario in get_test_data_calculer_capacite_batterie():
-        run_case_capacite(
-            consommation_service,
-            scenario["name"],
-            scenario["consommations"],
-            scenario["expected"]["capacite_totale_wh"],
-        )
-
-    print("\n" + "=" * 72)
-    print("VALIDATION calculerPuissanceMaxSimultanee")
-    print("=" * 72)
-    for scenario in get_test_data_puissance_max_simultanee():
-        run_case_puissance_max(
-            consommation_service,
-            scenario["name"],
-            scenario["consommations"],
-            scenario["expected"]["puissance_max"],
-        )
-
-    print("\n" + "=" * 72)
-    print("VALIDATION calculerConsommationTotale")
-    print("=" * 72)
-    for scenario in get_test_data_consommation_totale():
-        run_case_conso_totale(
-            consommation_service,
-            scenario["name"],
-            scenario["consommations"],
-            scenario["expected"]["consommation_totale_wh"],
-        )
-
-    print("\n" + "=" * 72)
-    print("TOUS LES TESTS SONT PASS")
-    print("=" * 72)
+    db_connexion.disconnect()
 
 
 if __name__ == "__main__":
-    print_test_data()
+    main()
