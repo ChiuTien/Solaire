@@ -28,7 +28,7 @@ CREATE TABLE ConfigJournee (
     heureDebut TIME,
     heureFin TIME,
     rendement INT,
-    idRessource INT
+    idStatut INT
 );
 
 -- Création de la table Resultat
