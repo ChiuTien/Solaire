@@ -1,10 +1,10 @@
 class ConfigJournee:
-	def __init__(self, id, heureDebut, heureFin, rendement, idRessource):
+	def __init__(self, id, heureDebut, heureFin, rendement, idStatut):
 		self._id = id
 		self._heureDebut = heureDebut
 		self._heureFin = heureFin
 		self._rendement = rendement
-		self._idRessource = idRessource
+		self.idStatut = idStatut
 
 	def get_id(self):
 		return self._id
@@ -30,15 +30,15 @@ class ConfigJournee:
 	def set_rendement(self, value):
 		self._rendement = value
 
-	def get_idRessource(self):
-		return self._idRessource
+	def get_idStatut(self):
+		return self._idStatut
 
-	def set_idRessource(self, value):
-		self._idRessource = value
+	def set_idStatut(self, value):
+		self._idStatut = value
 
 	def __str__(self):
 		return (
 			f"ConfigJournee(id={self._id}, heureDebut={self._heureDebut}, "
 			f"heureFin={self._heureFin}, rendement={self._rendement}, "
-			f"idRessource={self._idRessource})"
+			f"idStatut={self._idStatut})"
 		)
