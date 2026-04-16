@@ -2,3 +2,5 @@
 CREATE DATABASE Solaris;
 
 USE Solaris;
+
+DROP DATABASE Solaris;

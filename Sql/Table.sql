@@ -37,3 +37,9 @@ CREATE TABLE Resultat (
     idConfigJournee INT,
     idRessource INT
 );
+
+-- Création de la table statut 
+CREATE TABLE Statut (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    nom VARCHAR(100)
+);
