@@ -1297,17 +1297,27 @@ class SolaireGUI:
         res_p_max = self.consommation_service.calculerPuissanceMaxSimultanee(consommations)
         p_max = float(res_p_max.get("puissance_max", 0.0))
         
-        # 5. Panneau théorique et rendement
+        # 5. Panneau théorique et rendement - EN TENANT COMPTE DU NERF
         selected_matin = self.combo_calc_config_matin.get().strip()
+        selected_apres = self.combo_calc_config_apres.get().strip()
         config_matin_id = self.config_label_to_id.get(selected_matin)
+        config_apres_id = self.config_label_to_id.get(selected_apres)
         
-        rendement_journee = 0.40  # Default 40% rendement soleil
+        rendement_matin = 0.40  # Default 40% rendement soleil matin
+        rendement_apres = 0.40  # Default 40% rendement soleil après-midi (peut être réduit = "nerf")
+        
         if config_matin_id:
             cfg = self._get_config_by_id(config_matin_id)
             if cfg:
-                rendement_journee = float(cfg.rendement) / 100.0
+                rendement_matin = float(cfg.rendement) / 100.0
+        
+        if config_apres_id:
+            cfg = self._get_config_by_id(config_apres_id)
+            if cfg:
+                rendement_apres = float(cfg.rendement) / 100.0
         
         # Panneau pratique = pic + charge (puissance réelle requise)
+        # Le panneau doit fournir: appareils ET charger batterie en même temps
         panneau_pratique = p_max + p_charge
         
         # Rendement technique du panneau (utilise le rendement de la ressource sélectionnée)
@@ -1437,8 +1447,23 @@ class SolaireGUI:
         self.text_resultats.insert(tk.END, "-" * 50 + "\n")
         self.text_resultats.insert(tk.END, f"  Rendement technique : ", "")
         self.text_resultats.insert(tk.END, f"{rendement_ressource_panneau:.0f}%\n", "value")
-        self.text_resultats.insert(tk.END, f"  Puissance pratique : ", "")
-        self.text_resultats.insert(tk.END, f"{panneau_pratique:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  Rendement matin (06:00 → 17:00) : ", "")
+        self.text_resultats.insert(tk.END, f"{rendement_matin*100:.0f}%\n", "value")
+        self.text_resultats.insert(tk.END, f"  Rendement après-midi (17:00 → 19:00) : ", "")
+        self.text_resultats.insert(tk.END, f"{rendement_apres*100:.0f}%", "value")
+        
+        if rendement_apres < rendement_matin:
+            self.text_resultats.insert(tk.END, " ⚠️ NERF\n", "value")
+        else:
+            self.text_resultats.insert(tk.END, "\n", "value")
+        
+        self.text_resultats.insert(tk.END, f"\n  💡 Appareils (pic) : ", "")
+        self.text_resultats.insert(tk.END, f"{p_max:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  🔋 Charge batterie : ", "")
+        self.text_resultats.insert(tk.END, f"{p_charge:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  ➕ TOTAL (appareils + charge) : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_pratique:.2f} W\n\n", "value")
+        
         self.text_resultats.insert(tk.END, f"  Puissance théorique : ", "")
         self.text_resultats.insert(tk.END, f"{panneau_theorique:.2f} W\n\n", "value")
         
