@@ -5,6 +5,10 @@ class Connexion:
         self.serve = serve
         self.db = db
 
+        # Valider que tous les paramètres sont fournis
+        if not serve or not db or not user or password is None:
+            raise ValueError("Tous les paramètres de connexion (serveur, base, utilisateur, mot de passe) doivent être fournis")
+
         url = (f'mssql+pyodbc://{user}:{password}@'
                 f'{serve}/{db}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes'
                 )

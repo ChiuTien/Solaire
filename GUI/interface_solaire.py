@@ -612,11 +612,20 @@ class SolaireGUI:
         self.combo_calc_config_apres = ttk.Combobox(controls, state="readonly", width=28, font=('Segoe UI', 10))
         self.combo_calc_config_apres.grid(row=2, column=3, padx=10, pady=8, columnspan=1)
 
+        # Quatrième ligne - Sélection des ressources
+        ttk.Label(controls, text="Panneau à utiliser", style='TLabel').grid(row=3, column=0, sticky="w", pady=8)
+        self.combo_calc_panneau = ttk.Combobox(controls, state="readonly", width=28, font=('Segoe UI', 10))
+        self.combo_calc_panneau.grid(row=3, column=1, padx=10, pady=8, columnspan=1)
+        
+        ttk.Label(controls, text="Batterie à utiliser", style='TLabel').grid(row=3, column=2, sticky="w", pady=8)
+        self.combo_calc_batterie = ttk.Combobox(controls, state="readonly", width=28, font=('Segoe UI', 10))
+        self.combo_calc_batterie.grid(row=3, column=3, padx=10, pady=8, columnspan=1)
+
         # Boutons
         button_frame = ttk.Frame(controls_card)
         button_frame.pack(fill=tk.X, padx=20, pady=15)
         ttk.Button(button_frame, text="📊 Analyser et Calculer", command=self.run_dimensionnement).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="🔄 Recharger configs", command=self.refresh_configs).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Recharger tout", command=self.refresh_all).pack(side=tk.LEFT, padx=5)
 
         # Affichage des résultats
         results_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
@@ -665,12 +674,22 @@ class SolaireGUI:
         return str(value)
 
     def connect_db(self):
+        # Valider que tous les champs sont remplis
+        server = self.entry_server.get().strip()
+        db = self.entry_db.get().strip()
+        user = self.entry_user.get().strip()
+        password = self.entry_password.get().strip()
+        
+        if not server or not db or not user or not password:
+            messagebox.showwarning("Connexion", "⚠️ Veuillez remplir tous les champs:\n- Serveur\n- Base de données\n- Utilisateur\n- Mot de passe")
+            return
+        
         try:
             self.connexion = Connexion(
-                serve=self.entry_server.get().strip(),
-                db=self.entry_db.get().strip(),
-                user=self.entry_user.get().strip(),
-                password=self.entry_password.get().strip(),
+                serve=server,
+                db=db,
+                user=user,
+                password=password,
             )
             self.connexion.connect()
             self.sql_connection = self.connexion.connection
@@ -710,6 +729,7 @@ class SolaireGUI:
         self.refresh_consommations()
         self.refresh_ressources()
         self.refresh_charges()
+        self.refresh_ressources_combos()
 
     def refresh_materiels(self):
         if not self._ensure_connected():
@@ -924,6 +944,41 @@ class SolaireGUI:
         for row in rows:
             self.tree_ressources.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
 
+    def refresh_ressources_combos(self):
+        """Charge les ressources disponibles dans les dropdowns de panneau et batterie"""
+        if not self._ensure_connected():
+            return
+        
+        rows = self.ressource_service.findAll() or []
+        
+        # Séparer les panneaux et batteries basé sur le nom
+        panneaux_options = []
+        batteries_options = []
+        
+        for row in rows:
+            # row: (id, nom, puissanceTheorique, puissanceReelle, rendement)
+            resource_id = row[0]
+            resource_nom = row[1]
+            resource_rendement = row[4] if row[4] is not None else 100.0
+            
+            label = f"{resource_id} - {resource_nom} ({resource_rendement:.0f}%)"
+            
+            # Classification par nom
+            if "panneau" in resource_nom.lower():
+                panneaux_options.append(label)
+            elif "batterie" in resource_nom.lower():
+                batteries_options.append(label)
+        
+        # Mettre à jour les dropdowns
+        self.combo_calc_panneau["values"] = panneaux_options
+        self.combo_calc_batterie["values"] = batteries_options
+        
+        # Sélectionner le premier de chaque liste par défaut
+        if panneaux_options:
+            self.combo_calc_panneau.current(0)
+        if batteries_options:
+            self.combo_calc_batterie.current(0)
+
     def add_charge_if_missing(self):
         if not self._ensure_connected():
             return
@@ -1003,6 +1058,35 @@ class SolaireGUI:
         if not self._ensure_connected():
             return
 
+        # === RÉCUPÉRER LES RESSOURCES SÉLECTIONNÉES ===
+        selected_panneau_text = self.combo_calc_panneau.get().strip()
+        selected_batterie_text = self.combo_calc_batterie.get().strip()
+        
+        if not selected_panneau_text or not selected_batterie_text:
+            messagebox.showwarning("Calcul", "Veuillez sélectionner une ressource panneau et batterie")
+            return
+        
+        # Extraire les IDs et les rendements (format: "ID - nom (rendement%)")
+        try:
+            id_panneau_sel = int(selected_panneau_text.split(" - ")[0])
+            rendement_str = selected_panneau_text.split("(")[1].split("%")[0]
+            rendement_panneau_sel = float(rendement_str)
+            
+            id_batterie_sel = int(selected_batterie_text.split(" - ")[0])
+            rendement_str_bat = selected_batterie_text.split("(")[1].split("%")[0]
+            rendement_batterie_sel = float(rendement_str_bat)
+        except (ValueError, IndexError):
+            messagebox.showerror("Calcul", "Erreur lors du parsing des ressources sélectionnées")
+            return
+        
+        # Récupérer les données complètes des ressources sélectionnées
+        ressource_panneau = self.ressource_service.findById(id_panneau_sel)
+        ressource_batterie = self.ressource_service.findById(id_batterie_sel)
+        
+        if not ressource_panneau or not ressource_batterie:
+            messagebox.showerror("Calcul", "Ressource sélectionnée introuvable dans la base de données")
+            return
+
         consommations = self._read_consommations_as_models()
         if not consommations:
             messagebox.showwarning("Calcul", "Aucune consommation disponible")
@@ -1057,15 +1141,15 @@ class SolaireGUI:
         # Panneau pratique = pic + charge (puissance réelle requise)
         panneau_pratique = p_max + p_charge
         
-        # Rendement technique du panneau (par défaut 40%)
-        rendement_panneau = 0.40
+        # Rendement technique du panneau (utilise le rendement de la ressource sélectionnée)
+        rendement_panneau = rendement_panneau_sel / 100.0
         
         # Panneau théorique = pratique / rendement_panneau
         # (la puissance théorique que le panneau doit avoir pour fournir la puissance pratique)
         panneau_theorique = panneau_pratique / rendement_panneau if rendement_panneau > 0 else 0.0
         
         # Rendement total = rendement_panneau (cette ressource aura ce rendement)
-        rendement_ressource_panneau = rendement_panneau * 100  # Convertir en pourcentage
+        rendement_ressource_panneau = rendement_panneau_sel
         
         # 6. Besoin matin et midi (pics par tranche horaire)
         besoin_matin = 0.0
@@ -1124,21 +1208,23 @@ class SolaireGUI:
         if not exists:
             self.charge_service.save(charge_calculee)
         
-        # Ressources
-        # Pour la batterie : rendement par défaut 100% (on peut l'ajuster)
-        rendement_batterie = 100.0  # Vous pouvez changer à 75, 80, etc.
-        
-        id_res_panneau = self._upsert_ressource(
-            "Panneau solaire scolaire",
-            panneau_theorique,
-            panneau_pratique,
-            rendement_ressource_panneau
+        # Ressources: Mettre à jour les ressources sélectionnées avec les puissances calculées
+        # Batterie
+        self.ressource_service.update(
+            id_batterie_sel,
+            nom=ressource_batterie[1],  # Garder le nom existant
+            puissanceTheorique=batterie_reelle,
+            puissanceReelle=batterie_nuit,
+            rendement=rendement_batterie_sel
         )
-        id_res_batterie = self._upsert_ressource(
-            "Batterie scolaire",
-            batterie_reelle,
-            batterie_nuit,
-            rendement_batterie
+        
+        # Panneau
+        self.ressource_service.update(
+            id_panneau_sel,
+            nom=ressource_panneau[1],  # Garder le nom existant
+            puissanceTheorique=panneau_theorique,
+            puissanceReelle=panneau_pratique,
+            rendement=rendement_ressource_panneau
         )
         
         self.refresh_ressources()
@@ -1155,7 +1241,7 @@ class SolaireGUI:
         self.text_resultats.insert(tk.END, "🔋 BATTERIE\n", "title")
         self.text_resultats.insert(tk.END, "-" * 50 + "\n")
         self.text_resultats.insert(tk.END, f"  Rendement : ", "")
-        self.text_resultats.insert(tk.END, f"{rendement_batterie:.0f}%\n", "value")
+        self.text_resultats.insert(tk.END, f"{rendement_batterie_sel:.0f}%\n", "value")
         self.text_resultats.insert(tk.END, f"  Batterie (nuit 19:00 → 06:00) : ", "")
         self.text_resultats.insert(tk.END, f"{batterie_nuit:.2f} Wh\n", "value")
         self.text_resultats.insert(tk.END, f"  Batterie réelle (marge ×1.5) : ", "")
