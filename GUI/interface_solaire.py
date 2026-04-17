@@ -463,9 +463,18 @@ class SolaireGUI:
         # Ajouter une étiquette explicative
         ttk.Label(res_form, text="Panneau: 40% | Batterie: 75-100%", style='TLabel', foreground="#7f8c8d").grid(row=2, column=2, columnspan=2, sticky="w", padx=10, pady=8)
 
-        # Ligne 4 - Boutons
+        # Ligne 4 - Puissance nominale (ce que dit le vendeur)
+        ttk.Label(res_form, text="Puissance nominale (W)*", style='TLabel').grid(row=3, column=0, sticky="w", pady=8)
+        self.entry_res_nominale = ttk.Entry(res_form, width=14, font=('Segoe UI', 10))
+        self.entry_res_nominale.grid(row=3, column=1, padx=10, pady=8)
+
+        ttk.Label(res_form, text="Prix unitaire (€)*", style='TLabel').grid(row=3, column=2, sticky="w", pady=8, padx=(10, 0))
+        self.entry_res_prix = ttk.Entry(res_form, width=14, font=('Segoe UI', 10))
+        self.entry_res_prix.grid(row=3, column=3, padx=10, pady=8)
+
+        # Ligne 5 - Boutons
         res_btn_frame = ttk.Frame(res_form)
-        res_btn_frame.grid(row=3, column=0, columnspan=4, pady=15)
+        res_btn_frame.grid(row=4, column=0, columnspan=4, pady=15)
         ttk.Button(res_btn_frame, text="💾 Enregistrer", command=self.add_ressource).pack(side=tk.LEFT, padx=5)
         ttk.Button(res_btn_frame, text="🔄 Actualiser", command=self.refresh_ressources).pack(side=tk.LEFT, padx=5)
         
@@ -526,17 +535,20 @@ class SolaireGUI:
 
         self.tree_ressources = ttk.Treeview(
             res_tree_frame,
-            columns=("id", "nom", "theorique", "pratique", "rendement"),
+            columns=("id", "nom", "theorique", "pratique", "rendement", "nominale", "quantite", "prix"),
             show="headings",
             height=8,
         )
-        for col, label in zip(("id", "nom", "theorique", "pratique", "rendement"), ("ID", "Nom", "Théorique (W)", "Réelle (W)", "Rendement (%)")):
+        for col, label in zip(("id", "nom", "theorique", "pratique", "rendement", "nominale", "quantite", "prix"), ("ID", "Nom", "Théorique (W)", "Réelle (W)", "Rendement (%)", "Nominale (W)", "Quantité", "Prix Unitaire (€)")):
             self.tree_ressources.heading(col, text=label)
         self.tree_ressources.column("id", width=40)
-        self.tree_ressources.column("nom", width=120)
-        self.tree_ressources.column("theorique", width=100)
-        self.tree_ressources.column("pratique", width=100)
+        self.tree_ressources.column("nom", width=100)
+        self.tree_ressources.column("theorique", width=90)
+        self.tree_ressources.column("pratique", width=90)
         self.tree_ressources.column("rendement", width=80)
+        self.tree_ressources.column("nominale", width=90)
+        self.tree_ressources.column("quantite", width=70)
+        self.tree_ressources.column("prix", width=90)
         
         scrollbar = ttk.Scrollbar(res_tree_frame, orient=tk.VERTICAL, command=self.tree_ressources.yview)
         self.tree_ressources.configure(yscroll=scrollbar.set)
@@ -1007,15 +1019,32 @@ class SolaireGUI:
             p_theo = self._nullable_float(self.entry_res_theorique.get())
             p_pratique = self._nullable_float(self.entry_res_reelle.get())
             rendement = self._nullable_float(self.entry_res_rendement.get())
+            puissance_nominale = self._nullable_float(self.entry_res_nominale.get())
+            prix_unitaire = self._nullable_float(self.entry_res_prix.get())
+            
             if rendement is None:
                 rendement = 100.0
+            
+            if puissance_nominale is None:
+                messagebox.showwarning("Ressource", "Puissance nominale obligatoire")
+                return
         except ValueError:
-            messagebox.showwarning("Ressource", "Valeurs puissance/rendement invalides")
+            messagebox.showwarning("Ressource", "Valeurs invalides")
             return
 
-        res = Ressource(None, nom, p_theo, p_pratique, rendement)
+        # Créer la ressource avec les valeurs
+        res = Ressource(None, nom, p_theo, p_pratique, rendement, quantite=0, prix_unitaire=prix_unitaire or 0.0, puissance_nominale=puissance_nominale)
         ok = self.ressource_service.save(res)
         if ok:
+            # Nettoyer les champs
+            self.entry_res_nom.delete(0, tk.END)
+            self.entry_res_theorique.delete(0, tk.END)
+            self.entry_res_reelle.delete(0, tk.END)
+            self.entry_res_rendement.delete(0, tk.END)
+            self.entry_res_rendement.insert(0, "100")
+            self.entry_res_nominale.delete(0, tk.END)
+            self.entry_res_prix.delete(0, tk.END)
+            
             self.refresh_ressources()
             messagebox.showinfo("Ressource", "Ressource enregistrée")
         else:
@@ -1027,7 +1056,13 @@ class SolaireGUI:
         self._clear_tree(self.tree_ressources)
         rows = self.ressource_service.findAll() or []
         for row in rows:
-            self.tree_ressources.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
+            # row: (id, nom, puissanceTheorique, puissanceReelle, rendement, quantite, prix_unitaire, puissance_nominale)
+            self.tree_ressources.insert("", tk.END, values=(
+                row[0], row[1], row[2], row[3], row[4],
+                row[7] if row[7] is not None else "-",  # puissance_nominale
+                row[5] if row[5] is not None else 0,  # quantite
+                f"{row[6]:.2f}" if row[6] is not None else "0.00"  # prix_unitaire
+            ))
 
     def refresh_ressources_combos(self):
         """Charge les ressources et batteries disponibles dans les dropdowns"""
@@ -1246,6 +1281,11 @@ class SolaireGUI:
         ressource_panneau = self.ressource_service.findById(id_panneau_sel)
         ressource_batterie = self.batterie_service.findById(id_batterie_sel)
         
+        # Sauvegarder la puissance nominale d'UN SEUL panneau (ce que dit le vendeur)
+        # Cette valeur ne change jamais et est utilisée pour calculer la quantité
+        # row: (id, nom, puissanceTheorique, puissanceReelle, rendement, quantite, prix_unitaire, puissance_nominale)
+        puissance_nominale_panneau_unitaire = float(ressource_panneau[7]) if ressource_panneau[7] is not None else 1.0
+        
         if not ressource_panneau or not ressource_batterie:
             messagebox.showerror("Calcul", "Ressource sélectionnée introuvable dans la base de données")
             return
@@ -1397,12 +1437,21 @@ class SolaireGUI:
         )
         
         # Panneau
+        # Calculer la quantité de panneaux nécessaires
+        # Utiliser la puissance RÉELLE requise (panneau_pratique), pas la théorique
+        quantite_panneaux = self.ressource_service.calculer_quantite_panneaux(
+            panneau_pratique,  # Puissance réelle requise
+            puissance_nominale_panneau_unitaire
+        )
+        
         self.ressource_service.update(
             id_panneau_sel,
             nom=ressource_panneau[1],  # Garder le nom existant
             puissanceTheorique=panneau_theorique,
             puissanceReelle=panneau_pratique,
-            rendement=rendement_ressource_panneau
+            rendement=rendement_ressource_panneau,
+            quantite=quantite_panneaux,
+            puissance_nominale=puissance_nominale_panneau_unitaire
         )
         
         self.refresh_ressources()
@@ -1510,6 +1559,30 @@ class SolaireGUI:
         else:
             deficit = panneau_pratique - panneau_reel_apres
             self.text_resultats.insert(tk.END, f"  ⚠️ Après-midi: Déficit de {deficit:.2f} W (batterie doit compenser)\n", "success")
+        
+        # Section Coût et Quantité
+        self.text_resultats.insert(tk.END, "\n💰 ACHAT DE PANNEAUX\n", "title")
+        self.text_resultats.insert(tk.END, "-" * 50 + "\n")
+        
+        # Afficher le calcul de la quantité basé sur la puissance réelle
+        self.text_resultats.insert(tk.END, f"  Calcul: Puissance réelle requise ÷ Puissance nominale\n", "")
+        self.text_resultats.insert(tk.END, f"  {panneau_pratique:.2f}W ÷ {puissance_nominale_panneau_unitaire:.2f}W = ", "")
+        self.text_resultats.insert(tk.END, f"{quantite_panneaux} panneaux\n\n", "value")
+        
+        # Récupérer prix unitaire du panneau après update (voir si elle a été définie)
+        ressource_panneau_updated = self.ressource_service.findById(id_panneau_sel)
+        prix_unitaire = float(ressource_panneau_updated[6]) if ressource_panneau_updated[6] is not None else 0.0
+        prix_total = quantite_panneaux * prix_unitaire if prix_unitaire > 0 else 0.0
+        
+        self.text_resultats.insert(tk.END, f"  📦 Nombre de panneaux requis : ", "")
+        self.text_resultats.insert(tk.END, f"{quantite_panneaux}\n", "value")
+        self.text_resultats.insert(tk.END, f"  💵 Prix unitaire (estimé) : ", "")
+        self.text_resultats.insert(tk.END, f"{prix_unitaire:.2f} €\n", "value")
+        self.text_resultats.insert(tk.END, f"  💸 Coût total : ", "")
+        if prix_total > 0:
+            self.text_resultats.insert(tk.END, f"{prix_total:.2f} €\n\n", "value")
+        else:
+            self.text_resultats.insert(tk.END, f"Non défini (ajoutez un prix unitaire)\n\n", "value")
         
         self.text_resultats.insert(tk.END, "✓ Calcul complété et ressources actualisées", "success")
 
