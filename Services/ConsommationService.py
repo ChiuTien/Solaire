@@ -4,6 +4,53 @@ from datetime import datetime, time
 
 class ConsommationService:
 
+    class _InMemoryConsommationRepository:
+        """Fallback repository used when no database repository is provided."""
+
+        def __init__(self):
+            self._items = []
+            self._next_id = 1
+
+        def save(self, consommation):
+            if getattr(consommation, "id", None) is None:
+                consommation.id = self._next_id
+                self._next_id += 1
+            self._items.append(consommation)
+            return True
+
+        def findAll(self):
+            return list(self._items)
+
+        def findById(self, id_consommation):
+            return next((c for c in self._items if c.id == id_consommation), None)
+
+        def findByMateriel(self, idMateriel):
+            return [c for c in self._items if c.idMateriel == idMateriel]
+
+        def update(self, id_consommation, idMateriel=None, puissance=None, heureDebut=None, heureFin=None):
+            consommation = self.findById(id_consommation)
+            if consommation is None:
+                return False
+            if idMateriel is not None:
+                consommation.idMateriel = idMateriel
+            if puissance is not None:
+                consommation.puissance = puissance
+            if heureDebut is not None:
+                consommation.heureDebut = heureDebut
+            if heureFin is not None:
+                consommation.heureFin = heureFin
+            return True
+
+        def delete(self, id_consommation):
+            for index, consommation in enumerate(self._items):
+                if consommation.id == id_consommation:
+                    self._items.pop(index)
+                    return True
+            return False
+
+        def count(self):
+            return len(self._items)
+
     def __init__(self, consommationRepository: ConsommationRepository = None):
         """
         Initialise le service avec le repository.
@@ -11,15 +58,43 @@ class ConsommationService:
         Args:
             consommationRepository: Instance de ConsommationRepository
         """
-        self.consommationRepository = consommationRepository
+        self.consommationRepository = consommationRepository or self._InMemoryConsommationRepository()
     
     def save(self, consommation):
         """Enregistre une consommation via le repository."""
         return self.consommationRepository.save(consommation)
+
+    def create(self, consommation):
+        """Alias UI pour save."""
+        return self.save(consommation)
     
     def findAll(self):
         """Récupère toutes les consommations via le repository."""
         return self.consommationRepository.findAll()
+
+    def get_all(self):
+        """Retourne une liste de dictionnaires pour l'affichage UI."""
+        lignes = self.findAll() or []
+        resultat = []
+        for ligne in lignes:
+            if isinstance(ligne, (tuple, list)):
+                resultat.append({
+                    "id": ligne[0] if len(ligne) > 0 else None,
+                    "idMateriel": ligne[1] if len(ligne) > 1 else None,
+                    "puissance": ligne[2] if len(ligne) > 2 else 0,
+                    "heureDebut": str(ligne[3]) if len(ligne) > 3 else "",
+                    "heureFin": str(ligne[4]) if len(ligne) > 4 else "",
+                })
+                continue
+
+            resultat.append({
+                "id": getattr(ligne, "id", None),
+                "idMateriel": getattr(ligne, "idMateriel", None),
+                "puissance": getattr(ligne, "puissance", 0),
+                "heureDebut": str(getattr(ligne, "heureDebut", "")),
+                "heureFin": str(getattr(ligne, "heureFin", "")),
+            })
+        return resultat
     
     def findById(self, id_consommation):
         """Récupère une consommation par ID via le repository."""

@@ -39,4 +39,32 @@ en bas de cette phrase je veux que tu me donne le workflow du code que tu vas g�
 🚀 COMMENT LANCER:
 python UI/materiel_interface.py
 
-2 - 
+2 - refait le materiel_interface.py , et le matériel à insérer est la fusion du modèle materiel 
+et du modele consommation qui est la consommation de ce materiel avec tous les attributs correspondant.
+
+==================== WORKFLOW ====================
+
+🔄 ARCHITECTURE:
+
+UI appelle MaterielService et ConsommationService.
+Chaque ajout crée un Materiel puis une Consommation liée.
+Le tableau est construit par fusion des données des 2 services (jointure par idMateriel).
+📊 FLUX DE DONNÉES:
+
+Utilisateur remplit nom, type, puissance, heure début, heure fin.
+UI crée Materiel et appelle create côté service matériel.
+UI récupère idMateriel puis crée Consommation liée.
+UI recharge la liste fusionnée (Matériel + Consommation).
+Modifier/Supprimer appliquent les opérations synchronisées sur les 2 modèles.
+🎯 FONCTIONNALITÉS IMPLÉMENTÉES:
+
+Ajout fusionné Matériel + Consommation
+Liste fusionnée avec tous les champs clés
+Modification fusionnée
+Suppression fusionnée avec gestion des matériels orphelins
+Validation de puissance et format heure (HH:MM ou HH:MM:SS)
+Calcul et affichage puissance totale
+🚀 LANCEMENT:
+
+python materiel_interface.py
+
