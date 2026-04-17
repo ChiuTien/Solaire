@@ -5,9 +5,13 @@ import sys
 import os
 from datetime import time
 
-# Ajouter le chemin des Services
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'Services'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'Models'))
+# Ajouter les chemins PARENT (un niveau avant Tests/)
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)  # Chemin parent pour tous les imports
+sys.path.insert(0, os.path.join(parent_dir, 'Services'))
+sys.path.insert(0, os.path.join(parent_dir, 'Models'))
+sys.path.insert(0, os.path.join(parent_dir, 'Repositories'))
+sys.path.insert(0, os.path.join(parent_dir, 'Database'))
 
 from ConsommationService import ConsommationService
 from ChargeBatterieService import ChargeBatterieService
