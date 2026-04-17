@@ -28,9 +28,9 @@ class RessourceService:
         """Récupère les ressources par nom via le repository."""
         return self.ressourceRepository.findByNom(nom)
     
-    def update(self, id_ressource, nom=None, puissanceTheorique=None, puissanceReelle=None):
+    def update(self, id_ressource, nom=None, puissanceTheorique=None, puissanceReelle=None, rendement=None):
         """Modifie une ressource via le repository."""
-        return self.ressourceRepository.update(id_ressource, nom, puissanceTheorique, puissanceReelle)
+        return self.ressourceRepository.update(id_ressource, nom, puissanceTheorique, puissanceReelle, rendement)
     
     def delete(self, id_ressource):
         """Supprime une ressource via le repository."""

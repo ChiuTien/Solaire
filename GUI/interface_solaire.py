@@ -33,10 +33,25 @@ from Services.StatutService import StatutService
 
 
 class SolaireGUI:
+    # Palette de couleurs moderne
+    COLOR_BG = "#f0f2f5"
+    COLOR_PRIMARY = "#2c3e50"
+    COLOR_ACCENT = "#3498db"
+    COLOR_SUCCESS = "#27ae60"
+    COLOR_WARNING = "#f39c12"
+    COLOR_DANGER = "#e74c3c"
+    COLOR_TEXT = "#2c3e50"
+    COLOR_LIGHT = "#ecf0f1"
+    COLOR_FRAME = "#ffffff"
+    
     def __init__(self, root):
         self.root = root
-        self.root.title("Solaire - Interface de dimensionnement")
-        self.root.geometry("1280x760")
+        self.root.title("Solaire - Système de Dimensionnement")
+        self.root.geometry("1400x850")
+        self.root.configure(bg=self.COLOR_BG)
+        
+        # Configuration style ttk
+        self._setup_styles()
 
         self.connexion = None
         self.sql_connection = None
@@ -55,9 +70,64 @@ class SolaireGUI:
 
         self._build_ui()
 
+    def _setup_styles(self):
+        """Configure les styles ttk globaux"""
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Style pour les notebooks
+        style.configure('TNotebook', background=self.COLOR_BG, borderwidth=0)
+        style.configure('TNotebook.Tab', padding=[20, 12], font=('Segoe UI', 10, 'bold'))
+        style.map('TNotebook.Tab', 
+                  background=[('selected', self.COLOR_ACCENT)],
+                  foreground=[('selected', 'white')])
+        
+        # Style pour les frames
+        style.configure('TFrame', background=self.COLOR_BG)
+        style.configure('Card.TFrame', background=self.COLOR_FRAME, relief='flat')
+        
+        # Style pour les labels
+        style.configure('TLabel', background=self.COLOR_BG, foreground=self.COLOR_TEXT, font=('Segoe UI', 9))
+        style.configure('Title.TLabel', font=('Segoe UI', 12, 'bold'), foreground=self.COLOR_PRIMARY)
+        style.configure('Subtitle.TLabel', font=('Segoe UI', 10, 'bold'), foreground=self.COLOR_ACCENT)
+        
+        # Style pour les boutons
+        style.configure('TButton', font=('Segoe UI', 9, 'bold'), padding=[8, 6])
+        style.map('TButton',
+                  background=[('active', self.COLOR_ACCENT)],
+                  foreground=[('active', 'white')])
+        
+        style.configure('Primary.TButton', font=('Segoe UI', 9, 'bold'))
+        style.map('Primary.TButton',
+                  background=[('active', self.COLOR_SUCCESS)],
+                  foreground=[('active', 'white')])
+        
+        # Style pour les entries
+        style.configure('TEntry', fieldbackground='white', borderwidth=1, relief='solid')
+        
+        # Style pour les treeviews
+        style.configure('Treeview', 
+                       font=('Segoe UI', 9),
+                       rowheight=25,
+                       background=self.COLOR_FRAME,
+                       fieldbackground=self.COLOR_FRAME)
+        style.configure('Treeview.Heading', font=('Segoe UI', 9, 'bold'), background=self.COLOR_PRIMARY, foreground='white')
+        style.map('Treeview', background=[('selected', self.COLOR_ACCENT)], foreground=[('selected', 'white')])
+
     def _build_ui(self):
+        # Ajouter un header
+        header = tk.Frame(self.root, bg=self.COLOR_PRIMARY, height=70)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+        
+        title = tk.Label(header, text="☀️ Solaire - Système de Dimensionnement", 
+                        font=('Segoe UI', 18, 'bold'), 
+                        bg=self.COLOR_PRIMARY, fg='white', pady=20)
+        title.pack()
+        
+        # Notebook avec meilleur padding
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
         self.tab_connexion = ttk.Frame(self.notebook)
         self.tab_materiel = ttk.Frame(self.notebook)
@@ -66,12 +136,12 @@ class SolaireGUI:
         self.tab_ressource = ttk.Frame(self.notebook)
         self.tab_calcul = ttk.Frame(self.notebook)
 
-        self.notebook.add(self.tab_connexion, text="Connexion")
-        self.notebook.add(self.tab_materiel, text="Materiels")
-        self.notebook.add(self.tab_consommation, text="Consommations")
-        self.notebook.add(self.tab_config, text="Config et statut")
-        self.notebook.add(self.tab_ressource, text="Ressources et charge")
-        self.notebook.add(self.tab_calcul, text="Calcul solaire")
+        self.notebook.add(self.tab_connexion, text="🔌 Connexion")
+        self.notebook.add(self.tab_materiel, text="🔧 Matériels")
+        self.notebook.add(self.tab_consommation, text="⚡ Consommations")
+        self.notebook.add(self.tab_config, text="⚙️ Config & Statut")
+        self.notebook.add(self.tab_ressource, text="🔋 Ressources")
+        self.notebook.add(self.tab_calcul, text="📊 Calcul Solaire")
 
         self._build_tab_connexion()
         self._build_tab_materiel()
@@ -81,274 +151,499 @@ class SolaireGUI:
         self._build_tab_calcul()
 
     def _build_tab_connexion(self):
-        frame = ttk.Frame(self.tab_connexion, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_connexion, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="Serveur (ex: 127.0.0.1,1433)").grid(row=0, column=0, sticky="w", pady=6)
-        ttk.Label(frame, text="Base").grid(row=1, column=0, sticky="w", pady=6)
-        ttk.Label(frame, text="Utilisateur").grid(row=2, column=0, sticky="w", pady=6)
-        ttk.Label(frame, text="Mot de passe").grid(row=3, column=0, sticky="w", pady=6)
+        # Card pour la connexion
+        conn_frame = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        conn_frame.pack(fill=tk.X, pady=10)
+        
+        title = tk.Label(conn_frame, text="Informations de Connexion", 
+                        font=('Segoe UI', 11, 'bold'),
+                        bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        title.pack()
+        
+        form_frame = ttk.Frame(conn_frame)
+        form_frame.pack(fill=tk.X, padx=20, pady=10)
 
-        self.entry_server = ttk.Entry(frame, width=40)
-        self.entry_db = ttk.Entry(frame, width=40)
-        self.entry_user = ttk.Entry(frame, width=40)
-        self.entry_password = ttk.Entry(frame, width=40, show="*")
+        ttk.Label(form_frame, text="Serveur (ex: 127.0.0.1,1433)", style='TLabel').grid(row=0, column=0, sticky="w", pady=8)
+        ttk.Label(form_frame, text="Base de données", style='TLabel').grid(row=1, column=0, sticky="w", pady=8)
+        ttk.Label(form_frame, text="Utilisateur", style='TLabel').grid(row=2, column=0, sticky="w", pady=8)
+        ttk.Label(form_frame, text="Mot de passe", style='TLabel').grid(row=3, column=0, sticky="w", pady=8)
 
-        self.entry_server.grid(row=0, column=1, padx=10)
-        self.entry_db.grid(row=1, column=1, padx=10)
-        self.entry_user.grid(row=2, column=1, padx=10)
-        self.entry_password.grid(row=3, column=1, padx=10)
+        self.entry_server = ttk.Entry(form_frame, width=40, font=('Segoe UI', 10))
+        self.entry_db = ttk.Entry(form_frame, width=40, font=('Segoe UI', 10))
+        self.entry_user = ttk.Entry(form_frame, width=40, font=('Segoe UI', 10))
+        self.entry_password = ttk.Entry(form_frame, width=40, font=('Segoe UI', 10), show="•")
+
+        self.entry_server.grid(row=0, column=1, padx=15, pady=8)
+        self.entry_db.grid(row=1, column=1, padx=15, pady=8)
+        self.entry_user.grid(row=2, column=1, padx=15, pady=8)
+        self.entry_password.grid(row=3, column=1, padx=15, pady=8)
 
         self.entry_server.insert(0, "127.0.0.1,1433")
         self.entry_db.insert(0, "Solaris")
         self.entry_user.insert(0, "sa")
         self.entry_password.insert(0, "MotDePasseFort123!")
 
-        ttk.Button(frame, text="Connecter", command=self.connect_db).grid(row=4, column=0, pady=14)
-        ttk.Button(frame, text="Charger toutes les listes", command=self.refresh_all).grid(row=4, column=1, sticky="w", pady=14)
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=20)
+        ttk.Button(button_frame, text="✓ Connecter", command=self.connect_db).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Charger toutes les données", command=self.refresh_all).pack(side=tk.LEFT, padx=5)
 
-        self.connection_status = tk.StringVar(value="Non connecte")
-        ttk.Label(frame, textvariable=self.connection_status, foreground="blue").grid(row=5, column=0, columnspan=2, sticky="w", pady=8)
+        self.connection_status = tk.StringVar(value="● Non connecté")
+        status_label = tk.Label(conn_frame, textvariable=self.connection_status, 
+                               font=('Segoe UI', 10, 'bold'), bg=self.COLOR_FRAME, 
+                               fg=self.COLOR_DANGER, pady=10)
+        status_label.pack()
 
     def _build_tab_materiel(self):
-        frame = ttk.Frame(self.tab_materiel, padding=14)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_materiel, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        form = ttk.LabelFrame(frame, text="Ajouter / modifier materiel", padding=12)
-        form.pack(fill=tk.X)
+        # Formulaire d'ajout/modification
+        form_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        form_card.pack(fill=tk.X, pady=10)
+        
+        title = tk.Label(form_card, text="Ajouter / Modifier Matériel", 
+                        font=('Segoe UI', 11, 'bold'),
+                        bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        title.pack()
+        
+        form = ttk.Frame(form_card)
+        form.pack(fill=tk.X, padx=20, pady=10)
 
-        ttk.Label(form, text="Nom materiel").grid(row=0, column=0, sticky="w", pady=4)
-        self.entry_materiel_nom = ttk.Entry(form, width=34)
-        self.entry_materiel_nom.grid(row=0, column=1, padx=8, pady=4)
+        ttk.Label(form, text="Nom du matériel", style='TLabel').grid(row=0, column=0, sticky="w", pady=6)
+        self.entry_materiel_nom = ttk.Entry(form, width=34, font=('Segoe UI', 10))
+        self.entry_materiel_nom.grid(row=0, column=1, padx=15, pady=6)
 
-        ttk.Label(form, text="ID (pour update)").grid(row=1, column=0, sticky="w", pady=4)
-        self.entry_materiel_id = ttk.Entry(form, width=14)
-        self.entry_materiel_id.grid(row=1, column=1, sticky="w", padx=8, pady=4)
+        ttk.Label(form, text="ID (pour mise à jour)", style='TLabel').grid(row=1, column=0, sticky="w", pady=6)
+        self.entry_materiel_id = ttk.Entry(form, width=14, font=('Segoe UI', 10))
+        self.entry_materiel_id.grid(row=1, column=1, sticky="w", padx=15, pady=6)
 
-        ttk.Button(form, text="Ajouter materiel", command=self.add_materiel).grid(row=2, column=0, pady=8)
-        ttk.Button(form, text="Update materiel", command=self.update_materiel).grid(row=2, column=1, sticky="w", pady=8)
-        ttk.Button(form, text="Charger findAll", command=self.refresh_materiels).grid(row=2, column=2, padx=8, pady=8)
+        button_frame = ttk.Frame(form)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=15)
+        ttk.Button(button_frame, text="➕ Ajouter", command=self.add_materiel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="✏️ Modifier", command=self.update_materiel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Actualiser", command=self.refresh_materiels).pack(side=tk.LEFT, padx=5)
 
-        list_frame = ttk.LabelFrame(frame, text="Liste materiels (findAll)", padding=12)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Liste des matériels
+        list_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        list_card.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        list_title = tk.Label(list_card, text="Liste des Matériels", 
+                             font=('Segoe UI', 11, 'bold'),
+                             bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        list_title.pack()
 
-        self.tree_materiels = ttk.Treeview(list_frame, columns=("id", "nom"), show="headings", height=12)
+        tree_frame = ttk.Frame(list_card)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.tree_materiels = ttk.Treeview(tree_frame, columns=("id", "nom"), show="headings", height=14)
         self.tree_materiels.heading("id", text="ID")
-        self.tree_materiels.heading("nom", text="Nom")
-        self.tree_materiels.column("id", width=70)
-        self.tree_materiels.column("nom", width=320)
-        self.tree_materiels.pack(fill=tk.BOTH, expand=True)
+        self.tree_materiels.heading("nom", text="Nom du Matériel")
+        self.tree_materiels.column("id", width=80)
+        self.tree_materiels.column("nom", width=400)
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_materiels.yview)
+        self.tree_materiels.configure(yscroll=scrollbar.set)
+        
+        self.tree_materiels.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_tab_consommation(self):
-        frame = ttk.Frame(self.tab_consommation, padding=14)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_consommation, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        form = ttk.LabelFrame(frame, text="Entrer consommation", padding=12)
-        form.pack(fill=tk.X)
+        # Formulaire d'entrée
+        form_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        form_card.pack(fill=tk.X, pady=10)
+        
+        title = tk.Label(form_card, text="Enregistrer une Consommation", 
+                        font=('Segoe UI', 11, 'bold'),
+                        bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        title.pack()
+        
+        form = ttk.Frame(form_card)
+        form.pack(fill=tk.X, padx=20, pady=10)
 
-        ttk.Label(form, text="Materiel").grid(row=0, column=0, sticky="w", pady=4)
-        self.combo_conso_materiel = ttk.Combobox(form, state="readonly", width=28)
-        self.combo_conso_materiel.grid(row=0, column=1, padx=8, pady=4)
+        ttk.Label(form, text="Matériel", style='TLabel').grid(row=0, column=0, sticky="w", pady=6)
+        self.combo_conso_materiel = ttk.Combobox(form, state="readonly", width=28, font=('Segoe UI', 10))
+        self.combo_conso_materiel.grid(row=0, column=1, padx=15, pady=6)
 
-        ttk.Label(form, text="Puissance (W)").grid(row=0, column=2, sticky="w", pady=4)
-        self.entry_conso_puissance = ttk.Entry(form, width=12)
-        self.entry_conso_puissance.grid(row=0, column=3, padx=8, pady=4)
+        ttk.Label(form, text="Puissance (W)", style='TLabel').grid(row=0, column=2, sticky="w", pady=6)
+        self.entry_conso_puissance = ttk.Entry(form, width=14, font=('Segoe UI', 10))
+        self.entry_conso_puissance.grid(row=0, column=3, padx=15, pady=6)
 
-        ttk.Label(form, text="Heure debut (HH:MM:SS)").grid(row=1, column=0, sticky="w", pady=4)
-        self.entry_conso_debut = ttk.Entry(form, width=14)
+        ttk.Label(form, text="Heure début (HH:MM:SS)", style='TLabel').grid(row=1, column=0, sticky="w", pady=6)
+        self.entry_conso_debut = ttk.Entry(form, width=14, font=('Segoe UI', 10))
         self.entry_conso_debut.insert(0, "08:00:00")
-        self.entry_conso_debut.grid(row=1, column=1, padx=8, pady=4)
+        self.entry_conso_debut.grid(row=1, column=1, padx=15, pady=6)
 
-        ttk.Label(form, text="Heure fin (HH:MM:SS)").grid(row=1, column=2, sticky="w", pady=4)
-        self.entry_conso_fin = ttk.Entry(form, width=14)
+        ttk.Label(form, text="Heure fin (HH:MM:SS)", style='TLabel').grid(row=1, column=2, sticky="w", pady=6)
+        self.entry_conso_fin = ttk.Entry(form, width=14, font=('Segoe UI', 10))
         self.entry_conso_fin.insert(0, "10:00:00")
-        self.entry_conso_fin.grid(row=1, column=3, padx=8, pady=4)
+        self.entry_conso_fin.grid(row=1, column=3, padx=15, pady=6)
 
-        ttk.Button(form, text="Save consommation", command=self.add_consommation).grid(row=2, column=0, pady=8)
-        ttk.Button(form, text="Charger findAll", command=self.refresh_consommations).grid(row=2, column=1, sticky="w", pady=8)
-        ttk.Button(form, text="Trouver toutes puissances", command=self.show_all_puissances).grid(row=2, column=2, sticky="w", pady=8)
+        button_frame = ttk.Frame(form)
+        button_frame.grid(row=2, column=0, columnspan=4, pady=15)
+        ttk.Button(button_frame, text="💾 Enregistrer", command=self.add_consommation).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Actualiser", command=self.refresh_consommations).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="📈 Afficher puissances", command=self.show_all_puissances).pack(side=tk.LEFT, padx=5)
 
-        list_frame = ttk.LabelFrame(frame, text="Liste consommations", padding=12)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Liste des consommations
+        list_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        list_card.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        list_title = tk.Label(list_card, text="Liste des Consommations", 
+                             font=('Segoe UI', 11, 'bold'),
+                             bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        list_title.pack()
+
+        tree_frame = ttk.Frame(list_card)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.tree_consommations = ttk.Treeview(
-            list_frame,
+            tree_frame,
             columns=("id", "idMateriel", "puissance", "heureDebut", "heureFin"),
             show="headings",
-            height=12,
+            height=14,
         )
-        headers = ["ID", "ID Materiel", "Puissance", "Heure debut", "Heure fin"]
+        headers = ["ID", "ID Matériel", "Puissance (W)", "Heure début", "Heure fin"]
         for col, label in zip(("id", "idMateriel", "puissance", "heureDebut", "heureFin"), headers):
             self.tree_consommations.heading(col, text=label)
-        self.tree_consommations.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_consommations.yview)
+        self.tree_consommations.configure(yscroll=scrollbar.set)
+        
+        self.tree_consommations.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_tab_config(self):
-        frame = ttk.Frame(self.tab_config, padding=14)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_config, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        top = ttk.Frame(frame)
-        top.pack(fill=tk.X)
+        # Section supérieure avec deux colonnes
+        top_frame = ttk.Frame(main_frame)
+        top_frame.pack(fill=tk.X, pady=10)
 
-        statut_box = ttk.LabelFrame(top, text="Statut journee (findAll)", padding=10)
-        statut_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
+        # Statuts
+        statut_card = tk.Frame(top_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        statut_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        statut_title = tk.Label(statut_card, text="Statuts de la Journée", 
+                               font=('Segoe UI', 11, 'bold'),
+                               bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        statut_title.pack()
 
-        self.tree_statuts = ttk.Treeview(statut_box, columns=("id", "nom"), show="headings", height=8)
+        tree_frame = ttk.Frame(statut_card)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.tree_statuts = ttk.Treeview(tree_frame, columns=("id", "nom"), show="headings", height=8)
         self.tree_statuts.heading("id", text="ID")
         self.tree_statuts.heading("nom", text="Nom")
-        self.tree_statuts.pack(fill=tk.BOTH, expand=True)
-        ttk.Button(statut_box, text="Charger statuts", command=self.refresh_statuts).pack(anchor="w", pady=8)
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_statuts.yview)
+        self.tree_statuts.configure(yscroll=scrollbar.set)
+        self.tree_statuts.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        ttk.Button(statut_card, text="🔄 Actualiser statuts", command=self.refresh_statuts).pack(anchor="w", padx=10, pady=10)
 
-        config_box = ttk.LabelFrame(top, text="ConfigJournee", padding=10)
-        config_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0))
+        # Configuration Journée
+        config_card = tk.Frame(top_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        config_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
-        ttk.Label(config_box, text="Heure debut").grid(row=0, column=0, sticky="w", pady=4)
-        ttk.Label(config_box, text="Heure fin").grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Label(config_box, text="Rendement (%)").grid(row=2, column=0, sticky="w", pady=4)
-        ttk.Label(config_box, text="Statut").grid(row=3, column=0, sticky="w", pady=4)
+        config_title = tk.Label(config_card, text="Configuration Journée", 
+                               font=('Segoe UI', 11, 'bold'),
+                               bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        config_title.pack()
 
-        self.entry_config_debut = ttk.Entry(config_box, width=14)
+        form = ttk.Frame(config_card)
+        form.pack(fill=tk.X, padx=20, pady=10)
+
+        ttk.Label(form, text="Heure début", style='TLabel').grid(row=0, column=0, sticky="w", pady=6)
+        ttk.Label(form, text="Heure fin", style='TLabel').grid(row=1, column=0, sticky="w", pady=6)
+        ttk.Label(form, text="Rendement (%)", style='TLabel').grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Label(form, text="Statut", style='TLabel').grid(row=3, column=0, sticky="w", pady=6)
+
+        self.entry_config_debut = ttk.Entry(form, width=14, font=('Segoe UI', 10))
         self.entry_config_debut.insert(0, "06:00:00")
-        self.entry_config_fin = ttk.Entry(config_box, width=14)
+        self.entry_config_fin = ttk.Entry(form, width=14, font=('Segoe UI', 10))
         self.entry_config_fin.insert(0, "19:00:00")
-        self.entry_config_rendement = ttk.Entry(config_box, width=14)
+        self.entry_config_rendement = ttk.Entry(form, width=14, font=('Segoe UI', 10))
         self.entry_config_rendement.insert(0, "40")
-        self.combo_config_statut = ttk.Combobox(config_box, state="readonly", width=22)
+        self.combo_config_statut = ttk.Combobox(form, state="readonly", width=20, font=('Segoe UI', 10))
 
-        self.entry_config_debut.grid(row=0, column=1, padx=8)
-        self.entry_config_fin.grid(row=1, column=1, padx=8)
-        self.entry_config_rendement.grid(row=2, column=1, padx=8)
-        self.combo_config_statut.grid(row=3, column=1, padx=8)
+        self.entry_config_debut.grid(row=0, column=1, padx=10, pady=6)
+        self.entry_config_fin.grid(row=1, column=1, padx=10, pady=6)
+        self.entry_config_rendement.grid(row=2, column=1, padx=10, pady=6)
+        self.combo_config_statut.grid(row=3, column=1, padx=10, pady=6)
 
-        ttk.Button(config_box, text="Save config", command=self.add_config).grid(row=4, column=0, pady=8)
-        ttk.Button(config_box, text="Charger configs", command=self.refresh_configs).grid(row=4, column=1, sticky="w", pady=8)
+        button_frame = ttk.Frame(form)
+        button_frame.grid(row=4, column=0, columnspan=2, pady=15)
+        ttk.Button(button_frame, text="💾 Enregistrer", command=self.add_config).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Actualiser", command=self.refresh_configs).pack(side=tk.LEFT, padx=5)
 
-        bottom = ttk.LabelFrame(frame, text="Liste ConfigJournee", padding=10)
-        bottom.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Liste des configurations
+        list_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        list_card.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        list_title = tk.Label(list_card, text="Liste des Configurations", 
+                             font=('Segoe UI', 11, 'bold'),
+                             bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        list_title.pack()
+
+        tree_frame = ttk.Frame(list_card)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.tree_configs = ttk.Treeview(
-            bottom,
+            tree_frame,
             columns=("id", "heureDebut", "heureFin", "rendement", "idStatut"),
             show="headings",
             height=8,
         )
         for col, label in zip(
             ("id", "heureDebut", "heureFin", "rendement", "idStatut"),
-            ("ID", "Heure debut", "Heure fin", "Rendement", "ID Statut"),
+            ("ID", "Heure début", "Heure fin", "Rendement (%)", "ID Statut"),
         ):
             self.tree_configs.heading(col, text=label)
-        self.tree_configs.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_configs.yview)
+        self.tree_configs.configure(yscroll=scrollbar.set)
+        self.tree_configs.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_tab_ressource(self):
-        frame = ttk.Frame(self.tab_ressource, padding=14)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_ressource, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        top = ttk.Frame(frame)
-        top.pack(fill=tk.X)
+        # Ligne supérieure avec deux cartes
+        top_frame = ttk.Frame(main_frame)
+        top_frame.pack(fill=tk.X, pady=10)
 
-        res_box = ttk.LabelFrame(top, text="Ressource save/findAll", padding=10)
-        res_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
+        # Ressource
+        res_card = tk.Frame(top_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        res_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        ttk.Label(res_box, text="Nom").grid(row=0, column=0, sticky="w", pady=4)
-        ttk.Label(res_box, text="Puissance theorique (nullable)").grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Label(res_box, text="Puissance pratique (nullable)").grid(row=2, column=0, sticky="w", pady=4)
+        res_title = tk.Label(res_card, text="Ajouter Ressource", 
+                            font=('Segoe UI', 11, 'bold'),
+                            bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        res_title.pack()
 
-        self.entry_res_nom = ttk.Entry(res_box, width=26)
-        self.entry_res_theorique = ttk.Entry(res_box, width=12)
-        self.entry_res_reelle = ttk.Entry(res_box, width=12)
-        self.entry_res_nom.grid(row=0, column=1, padx=8)
-        self.entry_res_theorique.grid(row=1, column=1, padx=8)
-        self.entry_res_reelle.grid(row=2, column=1, padx=8)
+        res_form = ttk.Frame(res_card)
+        res_form.pack(fill=tk.X, padx=20, pady=10)
 
-        ttk.Button(res_box, text="Save ressource", command=self.add_ressource).grid(row=3, column=0, pady=8)
-        ttk.Button(res_box, text="Charger findAll", command=self.refresh_ressources).grid(row=3, column=1, sticky="w", pady=8)
+        # Ligne 1 - Nom
+        ttk.Label(res_form, text="Nom de la ressource", style='TLabel').grid(row=0, column=0, sticky="w", pady=8, columnspan=1)
+        self.entry_res_nom = ttk.Entry(res_form, width=30, font=('Segoe UI', 10))
+        self.entry_res_nom.grid(row=0, column=1, columnspan=2, padx=10, pady=8, sticky="ew")
 
-        charge_box = ttk.LabelFrame(top, text="Charge batterie", padding=10)
-        charge_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0))
+        # Ligne 2 - Puissance théorique et réelle
+        ttk.Label(res_form, text="Puissance théorique (W)", style='TLabel').grid(row=1, column=0, sticky="w", pady=8)
+        self.entry_res_theorique = ttk.Entry(res_form, width=14, font=('Segoe UI', 10))
+        self.entry_res_theorique.grid(row=1, column=1, padx=10, pady=8)
 
-        ttk.Label(charge_box, text="Heure debut").grid(row=0, column=0, sticky="w", pady=4)
-        ttk.Label(charge_box, text="Heure fin").grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Label(charge_box, text="Capacite (Wh)").grid(row=2, column=0, sticky="w", pady=4)
-        ttk.Label(charge_box, text="Puissance necessaire (W)").grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Label(res_form, text="Puissance réelle (W)", style='TLabel').grid(row=1, column=2, sticky="w", pady=8, padx=(10, 0))
+        self.entry_res_reelle = ttk.Entry(res_form, width=14, font=('Segoe UI', 10))
+        self.entry_res_reelle.grid(row=1, column=3, padx=10, pady=8)
 
-        self.entry_charge_debut = ttk.Entry(charge_box, width=14)
+        # Ligne 3 - Rendement
+        ttk.Label(res_form, text="Rendement (%)", style='TLabel').grid(row=2, column=0, sticky="w", pady=8)
+        self.entry_res_rendement = ttk.Entry(res_form, width=14, font=('Segoe UI', 10))
+        self.entry_res_rendement.insert(0, "100")
+        self.entry_res_rendement.grid(row=2, column=1, padx=10, pady=8)
+
+        # Ajouter une étiquette explicative
+        ttk.Label(res_form, text="Panneau: 40% | Batterie: 75-100%", style='TLabel', foreground="#7f8c8d").grid(row=2, column=2, columnspan=2, sticky="w", padx=10, pady=8)
+
+        # Ligne 4 - Boutons
+        res_btn_frame = ttk.Frame(res_form)
+        res_btn_frame.grid(row=3, column=0, columnspan=4, pady=15)
+        ttk.Button(res_btn_frame, text="💾 Enregistrer", command=self.add_ressource).pack(side=tk.LEFT, padx=5)
+        ttk.Button(res_btn_frame, text="🔄 Actualiser", command=self.refresh_ressources).pack(side=tk.LEFT, padx=5)
+        
+        # Configure column weights for better layout
+        res_form.columnconfigure(1, weight=1)
+
+        # Charge Batterie
+        charge_card = tk.Frame(top_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        charge_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+
+        charge_title = tk.Label(charge_card, text="Charge de Batterie", 
+                               font=('Segoe UI', 11, 'bold'),
+                               bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        charge_title.pack()
+
+        charge_form = ttk.Frame(charge_card)
+        charge_form.pack(fill=tk.X, padx=20, pady=10)
+
+        ttk.Label(charge_form, text="Heure début", style='TLabel').grid(row=0, column=0, sticky="w", pady=6)
+        ttk.Label(charge_form, text="Heure fin", style='TLabel').grid(row=1, column=0, sticky="w", pady=6)
+        ttk.Label(charge_form, text="Capacité (Wh)", style='TLabel').grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Label(charge_form, text="Puissance nécessaire (W)", style='TLabel').grid(row=3, column=0, sticky="w", pady=6)
+
+        self.entry_charge_debut = ttk.Entry(charge_form, width=14, font=('Segoe UI', 10))
         self.entry_charge_debut.insert(0, "10:00:00")
-        self.entry_charge_fin = ttk.Entry(charge_box, width=14)
+        self.entry_charge_fin = ttk.Entry(charge_form, width=14, font=('Segoe UI', 10))
         self.entry_charge_fin.insert(0, "14:00:00")
-        self.entry_charge_capacite = ttk.Entry(charge_box, width=14)
+        self.entry_charge_capacite = ttk.Entry(charge_form, width=14, font=('Segoe UI', 10))
         self.entry_charge_capacite.insert(0, "240")
-        self.entry_charge_puissance = ttk.Entry(charge_box, width=14)
+        self.entry_charge_puissance = ttk.Entry(charge_form, width=14, font=('Segoe UI', 10))
         self.entry_charge_puissance.insert(0, "60")
 
-        self.entry_charge_debut.grid(row=0, column=1, padx=8)
-        self.entry_charge_fin.grid(row=1, column=1, padx=8)
-        self.entry_charge_capacite.grid(row=2, column=1, padx=8)
-        self.entry_charge_puissance.grid(row=3, column=1, padx=8)
+        self.entry_charge_debut.grid(row=0, column=1, padx=10, pady=6)
+        self.entry_charge_fin.grid(row=1, column=1, padx=10, pady=6)
+        self.entry_charge_capacite.grid(row=2, column=1, padx=10, pady=6)
+        self.entry_charge_puissance.grid(row=3, column=1, padx=10, pady=6)
 
-        ttk.Button(charge_box, text="Save charge si inexistant", command=self.add_charge_if_missing).grid(row=4, column=0, pady=8)
-        ttk.Button(charge_box, text="Charger charges findAll", command=self.refresh_charges).grid(row=4, column=1, sticky="w", pady=8)
+        charge_btn_frame = ttk.Frame(charge_form)
+        charge_btn_frame.grid(row=4, column=0, columnspan=2, pady=15)
+        ttk.Button(charge_btn_frame, text="💾 Enregistrer", command=self.add_charge_if_missing).pack(side=tk.LEFT, padx=5)
+        ttk.Button(charge_btn_frame, text="🔄 Actualiser", command=self.refresh_charges).pack(side=tk.LEFT, padx=5)
 
-        bottom = ttk.Frame(frame)
-        bottom.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Listes en bas
+        bottom_frame = ttk.Frame(main_frame)
+        bottom_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Ressources
+        res_list_card = tk.Frame(bottom_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        res_list_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+
+        res_list_title = tk.Label(res_list_card, text="Liste des Ressources", 
+                                 font=('Segoe UI', 11, 'bold'),
+                                 bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        res_list_title.pack()
+
+        res_tree_frame = ttk.Frame(res_list_card)
+        res_tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.tree_ressources = ttk.Treeview(
-            bottom,
-            columns=("id", "nom", "theorique", "pratique"),
+            res_tree_frame,
+            columns=("id", "nom", "theorique", "pratique", "rendement"),
             show="headings",
-            height=7,
+            height=8,
         )
-        for col, label in zip(("id", "nom", "theorique", "pratique"), ("ID", "Nom", "Theorique", "Pratique")):
+        for col, label in zip(("id", "nom", "theorique", "pratique", "rendement"), ("ID", "Nom", "Théorique (W)", "Réelle (W)", "Rendement (%)")):
             self.tree_ressources.heading(col, text=label)
-        self.tree_ressources.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
+        self.tree_ressources.column("id", width=40)
+        self.tree_ressources.column("nom", width=120)
+        self.tree_ressources.column("theorique", width=100)
+        self.tree_ressources.column("pratique", width=100)
+        self.tree_ressources.column("rendement", width=80)
+        
+        scrollbar = ttk.Scrollbar(res_tree_frame, orient=tk.VERTICAL, command=self.tree_ressources.yview)
+        self.tree_ressources.configure(yscroll=scrollbar.set)
+        self.tree_ressources.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Charges
+        charge_list_card = tk.Frame(bottom_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        charge_list_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+
+        charge_list_title = tk.Label(charge_list_card, text="Liste des Charges", 
+                                    font=('Segoe UI', 11, 'bold'),
+                                    bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        charge_list_title.pack()
+
+        charge_tree_frame = ttk.Frame(charge_list_card)
+        charge_tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         self.tree_charges = ttk.Treeview(
-            bottom,
+            charge_tree_frame,
             columns=("id", "debut", "fin", "capacite", "puissance"),
             show="headings",
-            height=7,
+            height=8,
         )
         for col, label in zip(
             ("id", "debut", "fin", "capacite", "puissance"),
-            ("ID", "Heure debut", "Heure fin", "Capacite", "Puissance"),
+            ("ID", "Heure début", "Heure fin", "Capacité (Wh)", "Puissance (W)"),
         ):
             self.tree_charges.heading(col, text=label)
-        self.tree_charges.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0))
+        
+        scrollbar = ttk.Scrollbar(charge_tree_frame, orient=tk.VERTICAL, command=self.tree_charges.yview)
+        self.tree_charges.configure(yscroll=scrollbar.set)
+        self.tree_charges.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_tab_calcul(self):
-        frame = ttk.Frame(self.tab_calcul, padding=14)
-        frame.pack(fill=tk.BOTH, expand=True)
+        main_frame = ttk.Frame(self.tab_calcul, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        controls = ttk.LabelFrame(frame, text="Parametres de calcul", padding=10)
-        controls.pack(fill=tk.X)
+        # Carte de contrôles
+        controls_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        controls_card.pack(fill=tk.X, pady=10)
+        
+        controls_title = tk.Label(controls_card, text="Paramètres de Calcul", 
+                                 font=('Segoe UI', 11, 'bold'),
+                                 bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        controls_title.pack()
+        
+        controls = ttk.Frame(controls_card)
+        controls.pack(fill=tk.X, padx=20, pady=10)
 
-        ttk.Label(controls, text="Heure charge debut").grid(row=0, column=0, sticky="w", pady=4)
-        ttk.Label(controls, text="Heure charge fin").grid(row=0, column=2, sticky="w", pady=4)
-        ttk.Label(controls, text="Marge batterie (0.50 = 50%)").grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Label(controls, text="Config matin").grid(row=2, column=0, sticky="w", pady=4)
-        ttk.Label(controls, text="Config apres-midi").grid(row=2, column=2, sticky="w", pady=4)
-        ttk.Label(controls, text="ID Resultat a update").grid(row=3, column=0, sticky="w", pady=4)
-
-        self.entry_calc_charge_debut = ttk.Entry(controls, width=12)
+        # Première ligne
+        ttk.Label(controls, text="Heure charge début", style='TLabel').grid(row=0, column=0, sticky="w", pady=8)
+        ttk.Label(controls, text="Heure charge fin", style='TLabel').grid(row=0, column=2, sticky="w", pady=8)
+        
+        self.entry_calc_charge_debut = ttk.Entry(controls, width=12, font=('Segoe UI', 10))
         self.entry_calc_charge_debut.insert(0, "10:00:00")
-        self.entry_calc_charge_fin = ttk.Entry(controls, width=12)
+        self.entry_calc_charge_fin = ttk.Entry(controls, width=12, font=('Segoe UI', 10))
         self.entry_calc_charge_fin.insert(0, "14:00:00")
-        self.entry_calc_marge = ttk.Entry(controls, width=12)
+        
+        self.entry_calc_charge_debut.grid(row=0, column=1, padx=10, pady=8)
+        self.entry_calc_charge_fin.grid(row=0, column=3, padx=10, pady=8)
+
+        # Deuxième ligne
+        ttk.Label(controls, text="Marge batterie (0.50 = 50%)", style='TLabel').grid(row=1, column=0, sticky="w", pady=8)
+        self.entry_calc_marge = ttk.Entry(controls, width=12, font=('Segoe UI', 10))
         self.entry_calc_marge.insert(0, "0.50")
-        self.combo_calc_config_matin = ttk.Combobox(controls, state="readonly", width=30)
-        self.combo_calc_config_apres = ttk.Combobox(controls, state="readonly", width=30)
-        self.entry_calc_resultat_id = ttk.Entry(controls, width=12)
+        self.entry_calc_marge.grid(row=1, column=1, padx=10, pady=8)
+        
+        ttk.Label(controls, text="ID Résultat à mettre à jour", style='TLabel').grid(row=1, column=2, sticky="w", pady=8)
+        self.entry_calc_resultat_id = ttk.Entry(controls, width=12, font=('Segoe UI', 10))
+        self.entry_calc_resultat_id.grid(row=1, column=3, padx=10, pady=8, sticky="w")
 
-        self.entry_calc_charge_debut.grid(row=0, column=1, padx=8)
-        self.entry_calc_charge_fin.grid(row=0, column=3, padx=8)
-        self.entry_calc_marge.grid(row=1, column=1, padx=8)
-        self.combo_calc_config_matin.grid(row=2, column=1, padx=8)
-        self.combo_calc_config_apres.grid(row=2, column=3, padx=8)
-        self.entry_calc_resultat_id.grid(row=3, column=1, padx=8, sticky="w")
+        # Troisième ligne - Configurations
+        ttk.Label(controls, text="Config matin", style='TLabel').grid(row=2, column=0, sticky="w", pady=8)
+        self.combo_calc_config_matin = ttk.Combobox(controls, state="readonly", width=28, font=('Segoe UI', 10))
+        self.combo_calc_config_matin.grid(row=2, column=1, padx=10, pady=8, columnspan=1)
+        
+        ttk.Label(controls, text="Config après-midi", style='TLabel').grid(row=2, column=2, sticky="w", pady=8)
+        self.combo_calc_config_apres = ttk.Combobox(controls, state="readonly", width=28, font=('Segoe UI', 10))
+        self.combo_calc_config_apres.grid(row=2, column=3, padx=10, pady=8, columnspan=1)
 
-        ttk.Button(controls, text="Analyser et calculer", command=self.run_dimensionnement).grid(row=4, column=0, pady=8)
-        ttk.Button(controls, text="Recharger configs", command=self.refresh_configs).grid(row=4, column=1, sticky="w", pady=8)
+        # Boutons
+        button_frame = ttk.Frame(controls_card)
+        button_frame.pack(fill=tk.X, padx=20, pady=15)
+        ttk.Button(button_frame, text="📊 Analyser et Calculer", command=self.run_dimensionnement).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Recharger configs", command=self.refresh_configs).pack(side=tk.LEFT, padx=5)
 
-        self.text_resultats = tk.Text(frame, wrap="word", height=24)
-        self.text_resultats.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Affichage des résultats
+        results_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        results_card.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        results_title = tk.Label(results_card, text="Résultats du Calcul Solaire", 
+                                font=('Segoe UI', 11, 'bold'),
+                                bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        results_title.pack()
+        
+        text_frame = ttk.Frame(results_card)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.text_resultats = tk.Text(text_frame, wrap="word", height=16, font=('Segoe UI', 10),
+                                      bg='#f8f9fa', fg=self.COLOR_TEXT, relief=tk.FLAT, bd=1,
+                                      padx=15, pady=12)
+        
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text_resultats.yview)
+        self.text_resultats.configure(yscroll=scrollbar.set)
+        
+        self.text_resultats.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Configuration du texte avec couleurs
+        self.text_resultats.tag_configure("title", font=('Segoe UI', 10, 'bold'), foreground=self.COLOR_PRIMARY)
+        self.text_resultats.tag_configure("success", foreground=self.COLOR_SUCCESS, font=('Segoe UI', 10, 'bold'))
+        self.text_resultats.tag_configure("value", foreground=self.COLOR_ACCENT, font=('Segoe UI', 10, 'bold'))
 
     def _ensure_connected(self):
         if not self.sql_connection:
@@ -381,7 +676,7 @@ class SolaireGUI:
             self.sql_connection = self.connexion.connection
 
             if not self.sql_connection:
-                raise RuntimeError("Connexion non etablie")
+                raise RuntimeError("Connexion non établie")
 
             materiel_repo = MaterielRepository(self.sql_connection)
             consommation_repo = ConsommationRepository(self.sql_connection)
@@ -399,12 +694,12 @@ class SolaireGUI:
             self.charge_service = ChargeBatterieService(charge_repo)
             self.resultat_service = ResultatService(resultat_repo)
 
-            self.connection_status.set("Connecte")
+            self.connection_status.set("● Connecté avec succès")
             self.refresh_all()
-            messagebox.showinfo("Connexion", "Connexion reussie.")
+            messagebox.showinfo("Connexion", "✓ Connexion réussie à la base de données!")
         except Exception as exc:
-            self.connection_status.set("Erreur de connexion")
-            messagebox.showerror("Connexion", f"Echec connexion: {exc}")
+            self.connection_status.set("● Erreur de connexion")
+            messagebox.showerror("Connexion", f"✗ Échec de connexion:\n{exc}")
 
     def refresh_all(self):
         if not self._ensure_connected():
@@ -606,17 +901,20 @@ class SolaireGUI:
         try:
             p_theo = self._nullable_float(self.entry_res_theorique.get())
             p_pratique = self._nullable_float(self.entry_res_reelle.get())
+            rendement = self._nullable_float(self.entry_res_rendement.get())
+            if rendement is None:
+                rendement = 100.0
         except ValueError:
-            messagebox.showwarning("Ressource", "Valeurs puissance invalides")
+            messagebox.showwarning("Ressource", "Valeurs puissance/rendement invalides")
             return
 
-        res = Ressource(None, nom, p_theo, p_pratique)
+        res = Ressource(None, nom, p_theo, p_pratique, rendement)
         ok = self.ressource_service.save(res)
         if ok:
             self.refresh_ressources()
-            messagebox.showinfo("Ressource", "Ressource enregistree")
+            messagebox.showinfo("Ressource", "Ressource enregistrée")
         else:
-            messagebox.showerror("Ressource", "Save ressource echoue")
+            messagebox.showerror("Ressource", "Save ressource échoue")
 
     def refresh_ressources(self):
         if not self._ensure_connected():
@@ -624,7 +922,7 @@ class SolaireGUI:
         self._clear_tree(self.tree_ressources)
         rows = self.ressource_service.findAll() or []
         for row in rows:
-            self.tree_ressources.insert("", tk.END, values=(row[0], row[1], row[2], row[3]))
+            self.tree_ressources.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
 
     def add_charge_if_missing(self):
         if not self._ensure_connected():
@@ -682,7 +980,7 @@ class SolaireGUI:
         rows = self.consommation_service.findAll() or []
         return [Consommation(r[0], r[1], float(r[2]), self._fmt_time(r[3]), self._fmt_time(r[4])) for r in rows]
 
-    def _upsert_ressource(self, nom, puissance_theorique, puissance_pratique):
+    def _upsert_ressource(self, nom, puissance_theorique, puissance_pratique, rendement=100.0):
         matches = self.ressource_service.findByNom(nom) or []
         chosen = None
         for row in matches:
@@ -691,10 +989,10 @@ class SolaireGUI:
                 break
 
         if chosen:
-            self.ressource_service.update(chosen[0], nom=nom, puissanceTheorique=puissance_theorique, puissanceReelle=puissance_pratique)
+            self.ressource_service.update(chosen[0], nom=nom, puissanceTheorique=puissance_theorique, puissanceReelle=puissance_pratique, rendement=rendement)
             return chosen[0]
 
-        self.ressource_service.save(Ressource(None, nom, puissance_theorique, puissance_pratique))
+        self.ressource_service.save(Ressource(None, nom, puissance_theorique, puissance_pratique, rendement))
         matches = self.ressource_service.findByNom(nom) or []
         for row in matches:
             if row[1].strip().lower() == nom.strip().lower():
@@ -746,21 +1044,28 @@ class SolaireGUI:
         res_p_max = self.consommation_service.calculerPuissanceMaxSimultanee(consommations)
         p_max = float(res_p_max.get("puissance_max", 0.0))
         
-        # 5. Panneau théorique = (pic + charge) / rendement
+        # 5. Panneau théorique et rendement
         selected_matin = self.combo_calc_config_matin.get().strip()
         config_matin_id = self.config_label_to_id.get(selected_matin)
         
-        rendement = 0.40  # Default 40%
+        rendement_journee = 0.40  # Default 40% rendement soleil
         if config_matin_id:
             cfg = self._get_config_by_id(config_matin_id)
             if cfg:
-                rendement = float(cfg.rendement) / 100.0
+                rendement_journee = float(cfg.rendement) / 100.0
         
-        # Panneau pratique = pic + charge
+        # Panneau pratique = pic + charge (puissance réelle requise)
         panneau_pratique = p_max + p_charge
         
-        # Panneau théorique = pratique / rendement
-        panneau_theorique = panneau_pratique / rendement if rendement > 0 else 0.0
+        # Rendement technique du panneau (par défaut 40%)
+        rendement_panneau = 0.40
+        
+        # Panneau théorique = pratique / rendement_panneau
+        # (la puissance théorique que le panneau doit avoir pour fournir la puissance pratique)
+        panneau_theorique = panneau_pratique / rendement_panneau if rendement_panneau > 0 else 0.0
+        
+        # Rendement total = rendement_panneau (cette ressource aura ce rendement)
+        rendement_ressource_panneau = rendement_panneau * 100  # Convertir en pourcentage
         
         # 6. Besoin matin et midi (pics par tranche horaire)
         besoin_matin = 0.0
@@ -820,39 +1125,69 @@ class SolaireGUI:
             self.charge_service.save(charge_calculee)
         
         # Ressources
+        # Pour la batterie : rendement par défaut 100% (on peut l'ajuster)
+        rendement_batterie = 100.0  # Vous pouvez changer à 75, 80, etc.
+        
         id_res_panneau = self._upsert_ressource(
             "Panneau solaire scolaire",
             panneau_theorique,
             panneau_pratique,
+            rendement_ressource_panneau
         )
         id_res_batterie = self._upsert_ressource(
             "Batterie scolaire",
             batterie_reelle,
             batterie_nuit,
+            rendement_batterie
         )
         
         self.refresh_ressources()
         self.refresh_charges()
         
-        # Affichage simple
-        lines = [
-            "=== CALCUL SOLAIRE (MÉTHODE NUIT SEULEMENT) ===",
-            "",
-            f"Batterie (nuit 19:00→06:00): {batterie_nuit:.2f} Wh",
-            f"Batterie réelle (×1.5): {batterie_reelle:.2f} Wh",
-            "",
-            f"Puissance recharge batterie (÷12h): {p_charge:.2f} W",
-            "",
-            f"Besoin matin (06:00→17:00): {besoin_matin:.2f} W",
-            f"Besoin après-midi (17:00→19:00): {besoin_midi:.2f} W",
-            f"Pic instantané: {p_max:.2f} W",
-            "",
-            f"Panneau solaire pratique: {panneau_pratique:.2f} W",
-            f"Panneau solaire théorique (÷{rendement*100:.0f}%): {panneau_theorique:.2f} W",
-        ]
-        
+        # Affichage avec meilleur formatage
         self.text_resultats.delete("1.0", tk.END)
-        self.text_resultats.insert(tk.END, "\n".join(lines))
+        
+        # Titre
+        self.text_resultats.insert(tk.END, "⚡ CALCUL SOLAIRE - MÉTHODE NUIT SEULEMENT\n", "title")
+        self.text_resultats.insert(tk.END, "=" * 50 + "\n\n")
+        
+        # Section Batterie
+        self.text_resultats.insert(tk.END, "🔋 BATTERIE\n", "title")
+        self.text_resultats.insert(tk.END, "-" * 50 + "\n")
+        self.text_resultats.insert(tk.END, f"  Rendement : ", "")
+        self.text_resultats.insert(tk.END, f"{rendement_batterie:.0f}%\n", "value")
+        self.text_resultats.insert(tk.END, f"  Batterie (nuit 19:00 → 06:00) : ", "")
+        self.text_resultats.insert(tk.END, f"{batterie_nuit:.2f} Wh\n", "value")
+        self.text_resultats.insert(tk.END, f"  Batterie réelle (marge ×1.5) : ", "")
+        self.text_resultats.insert(tk.END, f"{batterie_reelle:.2f} Wh\n\n", "value")
+        
+        # Section Charge
+        self.text_resultats.insert(tk.END, "⚙️ CHARGE\n", "title")
+        self.text_resultats.insert(tk.END, "-" * 50 + "\n")
+        self.text_resultats.insert(tk.END, f"  Puissance recharge (÷12h) : ", "")
+        self.text_resultats.insert(tk.END, f"{p_charge:.2f} W\n\n", "value")
+        
+        # Section Besoins
+        self.text_resultats.insert(tk.END, "📊 BESOINS ÉNERGÉTIQUES\n", "title")
+        self.text_resultats.insert(tk.END, "-" * 50 + "\n")
+        self.text_resultats.insert(tk.END, f"  Besoin matin (06:00 → 17:00) : ", "")
+        self.text_resultats.insert(tk.END, f"{besoin_matin:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  Besoin après-midi (17:00 → 19:00) : ", "")
+        self.text_resultats.insert(tk.END, f"{besoin_midi:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  Pic instantané : ", "")
+        self.text_resultats.insert(tk.END, f"{p_max:.2f} W\n\n", "value")
+        
+        # Section Panneau
+        self.text_resultats.insert(tk.END, "☀️ PANNEAU SOLAIRE\n", "title")
+        self.text_resultats.insert(tk.END, "-" * 50 + "\n")
+        self.text_resultats.insert(tk.END, f"  Rendement technique : ", "")
+        self.text_resultats.insert(tk.END, f"{rendement_ressource_panneau:.0f}%\n", "value")
+        self.text_resultats.insert(tk.END, f"  Puissance pratique : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_pratique:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"  Puissance théorique : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_theorique:.2f} W\n\n", "value")
+        
+        self.text_resultats.insert(tk.END, "✓ Calcul complété et ressources actualisées", "success")
 
 
 def run():
