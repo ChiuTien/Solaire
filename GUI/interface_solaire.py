@@ -1445,27 +1445,71 @@ class SolaireGUI:
         # Section Panneau
         self.text_resultats.insert(tk.END, "☀️ PANNEAU SOLAIRE\n", "title")
         self.text_resultats.insert(tk.END, "-" * 50 + "\n")
-        self.text_resultats.insert(tk.END, f"  Rendement technique : ", "")
-        self.text_resultats.insert(tk.END, f"{rendement_ressource_panneau:.0f}%\n", "value")
+        
+        # Puissances DU PANNEAU (valeurs calculées et sauvegardées à l'instant)
+        # panneau_theorique et panneau_pratique ont été calculés ci-dessus
+        panneau_theo_initial = panneau_theorique
+        panneau_reel_initial = panneau_pratique
+        
+        self.text_resultats.insert(tk.END, f"  📌 Panneau sélectionné: {ressource_panneau[1]}\n", "")
+        self.text_resultats.insert(tk.END, f"     (ID: {ressource_panneau[0]})\n\n", "")
+        
+        # Affichage des puissances du panneau
+        self.text_resultats.insert(tk.END, f"  📦 PUISSANCE THÉORIQUE (à acheter) : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_theo_initial:.2f} W\n", "value")
+        
+        self.text_resultats.insert(tk.END, f"  💾 PUISSANCE RÉELLE (fournie matin 40%) : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_reel_initial:.2f} W\n\n", "value")
+        
+        self.text_resultats.insert(tk.END, f"  Rendement technique du panneau: ", "")
+        self.text_resultats.insert(tk.END, f"{rendement_ressource_panneau:.0f}%\n\n", "value")
+        
         self.text_resultats.insert(tk.END, f"  Rendement matin (06:00 → 17:00) : ", "")
         self.text_resultats.insert(tk.END, f"{rendement_matin*100:.0f}%\n", "value")
         self.text_resultats.insert(tk.END, f"  Rendement après-midi (17:00 → 19:00) : ", "")
         self.text_resultats.insert(tk.END, f"{rendement_apres*100:.0f}%", "value")
         
         if rendement_apres < rendement_matin:
-            self.text_resultats.insert(tk.END, " ⚠️ NERF\n", "value")
+            self.text_resultats.insert(tk.END, " ⚠️ NERF\n\n", "value")
         else:
-            self.text_resultats.insert(tk.END, "\n", "value")
+            self.text_resultats.insert(tk.END, "\n\n", "value")
         
-        self.text_resultats.insert(tk.END, f"\n  💡 Appareils (pic) : ", "")
+        self.text_resultats.insert(tk.END, f"  💡 Appareils (pic) : ", "")
         self.text_resultats.insert(tk.END, f"{p_max:.2f} W\n", "value")
         self.text_resultats.insert(tk.END, f"  🔋 Charge batterie : ", "")
         self.text_resultats.insert(tk.END, f"{p_charge:.2f} W\n", "value")
         self.text_resultats.insert(tk.END, f"  ➕ TOTAL (appareils + charge) : ", "")
         self.text_resultats.insert(tk.END, f"{panneau_pratique:.2f} W\n\n", "value")
         
-        self.text_resultats.insert(tk.END, f"  Puissance théorique : ", "")
-        self.text_resultats.insert(tk.END, f"{panneau_theorique:.2f} W\n\n", "value")
+        # Calculer puissance réelle selon l'ensoleillement
+        panneau_reel_matin = panneau_theo_initial * rendement_matin
+        panneau_reel_apres = panneau_theo_initial * rendement_apres
+        
+        self.text_resultats.insert(tk.END, f"  ⚡ PUISSANCE RÉELLE FOURNIE (selon ensoleillement):\n", "")
+        self.text_resultats.insert(tk.END, f"    - Matin (06:00-17:00, {rendement_matin*100:.0f}%) : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_reel_matin:.2f} W\n", "value")
+        self.text_resultats.insert(tk.END, f"    - Après-midi (17:00-19:00, {rendement_apres*100:.0f}%) : ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_reel_apres:.2f} W", "value")
+        if rendement_apres < rendement_matin:
+            self.text_resultats.insert(tk.END, " ⚠️ NERF\n", "value")
+        else:
+            self.text_resultats.insert(tk.END, "\n", "value")
+        
+        self.text_resultats.insert(tk.END, f"\n  🎯 Puissance requise (appareils + charge): ", "")
+        self.text_resultats.insert(tk.END, f"{panneau_pratique:.2f} W\n\n", "value")
+        
+        # Vérifications
+        if panneau_reel_matin >= panneau_pratique:
+            self.text_resultats.insert(tk.END, f"  ✅ Matin: Le panneau peut fournir\n", "success")
+        else:
+            deficit = panneau_pratique - panneau_reel_matin
+            self.text_resultats.insert(tk.END, f"  ⚠️ Matin: Déficit de {deficit:.2f} W\n", "success")
+        
+        if panneau_reel_apres >= panneau_pratique:
+            self.text_resultats.insert(tk.END, f"  ✅ Après-midi: Le panneau peut fournir\n", "success")
+        else:
+            deficit = panneau_pratique - panneau_reel_apres
+            self.text_resultats.insert(tk.END, f"  ⚠️ Après-midi: Déficit de {deficit:.2f} W (batterie doit compenser)\n", "success")
         
         self.text_resultats.insert(tk.END, "✓ Calcul complété et ressources actualisées", "success")
 
