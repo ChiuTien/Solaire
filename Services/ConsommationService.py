@@ -4,7 +4,7 @@ from datetime import datetime, time
 
 class ConsommationService:
 
-    def __init__(self, consommationRepository: ConsommationRepository):
+    def __init__(self, consommationRepository: ConsommationRepository = None):
         """
         Initialise le service avec le repository.
         
