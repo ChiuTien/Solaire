@@ -10,12 +10,14 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from Database.Connexion import Connexion
+from Models.Batterie import Batterie
 from Models.ChargeBatterie import ChargeBatterie
 from Models.ConfigJournee import ConfigJournee
 from Models.Consommation import Consommation
 from Models.Materiel import Materiel
 from Models.Ressource import Ressource
 from Models.Resultat import Resultat
+from Repositories.BatterieRepository import BatterieRepository
 from Repositories.ChargeBatterieRepository import ChargeBatterieRepository
 from Repositories.ConfigJourneeRepository import ConfigJourneeRepository
 from Repositories.ConsommationRepository import ConsommationRepository
@@ -23,6 +25,7 @@ from Repositories.MaterielRepository import MaterielRepository
 from Repositories.RessourceRepository import RessourceRepository
 from Repositories.ResultatRepository import ResultatRepository
 from Repositories.StatutRepository import StatutRepository
+from Services.BatterieService import BatterieService
 from Services.ChargeBatterieService import ChargeBatterieService
 from Services.ConfigJourneeService import ConfigJourneeService
 from Services.ConsommationService import ConsommationService
@@ -61,6 +64,7 @@ class SolaireGUI:
         self.config_service = None
         self.statut_service = None
         self.ressource_service = None
+        self.batterie_service = None
         self.charge_service = None
         self.resultat_service = None
 
@@ -134,13 +138,15 @@ class SolaireGUI:
         self.tab_consommation = ttk.Frame(self.notebook)
         self.tab_config = ttk.Frame(self.notebook)
         self.tab_ressource = ttk.Frame(self.notebook)
+        self.tab_batterie = ttk.Frame(self.notebook)
         self.tab_calcul = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_connexion, text="🔌 Connexion")
         self.notebook.add(self.tab_materiel, text="🔧 Matériels")
         self.notebook.add(self.tab_consommation, text="⚡ Consommations")
         self.notebook.add(self.tab_config, text="⚙️ Config & Statut")
-        self.notebook.add(self.tab_ressource, text="🔋 Ressources")
+        self.notebook.add(self.tab_ressource, text="☀️ Ressources")
+        self.notebook.add(self.tab_batterie, text="🔋 Batteries")
         self.notebook.add(self.tab_calcul, text="📊 Calcul Solaire")
 
         self._build_tab_connexion()
@@ -148,6 +154,7 @@ class SolaireGUI:
         self._build_tab_consommation()
         self._build_tab_config()
         self._build_tab_ressource()
+        self._build_tab_batterie()
         self._build_tab_calcul()
 
     def _build_tab_connexion(self):
@@ -559,10 +566,85 @@ class SolaireGUI:
             ("ID", "Heure début", "Heure fin", "Capacité (Wh)", "Puissance (W)"),
         ):
             self.tree_charges.heading(col, text=label)
+        self.tree_charges.column("id", width=50)
+        self.tree_charges.column("debut", width=110)
+        self.tree_charges.column("fin", width=110)
+        self.tree_charges.column("capacite", width=140)
+        self.tree_charges.column("puissance", width=120)
         
         scrollbar = ttk.Scrollbar(charge_tree_frame, orient=tk.VERTICAL, command=self.tree_charges.yview)
         self.tree_charges.configure(yscroll=scrollbar.set)
         self.tree_charges.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def _build_tab_batterie(self):
+        main_frame = ttk.Frame(self.tab_batterie, padding=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Formulaire d'ajout/modification
+        form_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        form_card.pack(fill=tk.X, pady=10)
+        
+        title = tk.Label(form_card, text="Ajouter / Modifier Batterie", 
+                        font=('Segoe UI', 11, 'bold'),
+                        bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        title.pack()
+        
+        form = ttk.Frame(form_card)
+        form.pack(fill=tk.X, padx=20, pady=10)
+
+        # Ligne 1 - Capacité théorique et réelle
+        ttk.Label(form, text="Capacité théorique (Wh)", style='TLabel').grid(row=0, column=0, sticky="w", pady=8)
+        self.entry_batterie_theo = ttk.Entry(form, width=20, font=('Segoe UI', 10))
+        self.entry_batterie_theo.grid(row=0, column=1, padx=15, pady=8)
+
+        ttk.Label(form, text="Capacité réelle (Wh)", style='TLabel').grid(row=0, column=2, sticky="w", pady=8, padx=(10, 0))
+        self.entry_batterie_reelle = ttk.Entry(form, width=20, font=('Segoe UI', 10))
+        self.entry_batterie_reelle.grid(row=0, column=3, padx=15, pady=8)
+
+        # Ligne 2 - Rendement et ID
+        ttk.Label(form, text="Rendement (%)", style='TLabel').grid(row=1, column=0, sticky="w", pady=8)
+        self.entry_batterie_rendement = ttk.Entry(form, width=20, font=('Segoe UI', 10))
+        self.entry_batterie_rendement.insert(0, "100")
+        self.entry_batterie_rendement.grid(row=1, column=1, padx=15, pady=8)
+
+        ttk.Label(form, text="ID (pour mise à jour)", style='TLabel').grid(row=1, column=2, sticky="w", pady=8, padx=(10, 0))
+        self.entry_batterie_id = ttk.Entry(form, width=20, font=('Segoe UI', 10))
+        self.entry_batterie_id.grid(row=1, column=3, padx=15, pady=8)
+
+        # Ligne 3 - Boutons
+        button_frame = ttk.Frame(form)
+        button_frame.grid(row=2, column=0, columnspan=4, pady=15)
+        ttk.Button(button_frame, text="➕ Ajouter", command=self.add_batterie).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="✏️ Modifier", command=self.update_batterie).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="🔄 Actualiser", command=self.refresh_batteries).pack(side=tk.LEFT, padx=5)
+
+        # Liste des batteries
+        list_card = tk.Frame(main_frame, bg=self.COLOR_FRAME, relief=tk.RAISED, bd=1)
+        list_card.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        list_title = tk.Label(list_card, text="Liste des Batteries", 
+                             font=('Segoe UI', 11, 'bold'),
+                             bg=self.COLOR_FRAME, fg=self.COLOR_PRIMARY, pady=10)
+        list_title.pack()
+
+        tree_frame = ttk.Frame(list_card)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.tree_batteries = ttk.Treeview(tree_frame, columns=("id", "theo", "reelle", "rendement"), show="headings", height=14)
+        self.tree_batteries.heading("id", text="ID")
+        self.tree_batteries.heading("theo", text="Capacité théorique (Wh)")
+        self.tree_batteries.heading("reelle", text="Capacité réelle (Wh)")
+        self.tree_batteries.heading("rendement", text="Rendement (%)")
+        self.tree_batteries.column("id", width=80)
+        self.tree_batteries.column("theo", width=200)
+        self.tree_batteries.column("reelle", width=200)
+        self.tree_batteries.column("rendement", width=150)
+        
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_batteries.yview)
+        self.tree_batteries.configure(yscroll=scrollbar.set)
+        
+        self.tree_batteries.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     def _build_tab_calcul(self):
@@ -702,6 +784,7 @@ class SolaireGUI:
             config_repo = ConfigJourneeRepository(self.sql_connection)
             statut_repo = StatutRepository(self.sql_connection)
             ressource_repo = RessourceRepository(self.sql_connection)
+            batterie_repo = BatterieRepository(self.sql_connection)
             charge_repo = ChargeBatterieRepository(self.sql_connection)
             resultat_repo = ResultatRepository(self.sql_connection)
 
@@ -710,6 +793,7 @@ class SolaireGUI:
             self.config_service = ConfigJourneeService(config_repo)
             self.statut_service = StatutService(statut_repo)
             self.ressource_service = RessourceService(ressource_repo)
+            self.batterie_service = BatterieService(self.sql_connection)
             self.charge_service = ChargeBatterieService(charge_repo)
             self.resultat_service = ResultatService(resultat_repo)
 
@@ -728,6 +812,7 @@ class SolaireGUI:
         self.refresh_configs()
         self.refresh_consommations()
         self.refresh_ressources()
+        self.refresh_batteries()
         self.refresh_charges()
         self.refresh_ressources_combos()
 
@@ -945,29 +1030,35 @@ class SolaireGUI:
             self.tree_ressources.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4]))
 
     def refresh_ressources_combos(self):
-        """Charge les ressources disponibles dans les dropdowns de panneau et batterie"""
+        """Charge les ressources et batteries disponibles dans les dropdowns"""
         if not self._ensure_connected():
             return
         
-        rows = self.ressource_service.findAll() or []
-        
-        # Séparer les panneaux et batteries basé sur le nom
+        # === PANNEAUX (depuis Ressource) ===
         panneaux_options = []
-        batteries_options = []
+        ressource_rows = self.ressource_service.findAll() or []
         
-        for row in rows:
+        for row in ressource_rows:
             # row: (id, nom, puissanceTheorique, puissanceReelle, rendement)
             resource_id = row[0]
             resource_nom = row[1]
-            resource_rendement = row[4] if row[4] is not None else 100.0
+            resource_puissance = row[2] if row[2] is not None else 0
             
-            label = f"{resource_id} - {resource_nom} ({resource_rendement:.0f}%)"
+            label = f"{resource_id} - {resource_nom} ({resource_puissance}W)"
+            panneaux_options.append(label)
+        
+        # === BATTERIES (depuis Batterie) ===
+        batteries_options = []
+        batterie_rows = self.batterie_service.findAll() or []
+        
+        for row in batterie_rows:
+            # row: (id, capaciteTheorique, capaciteReelle, rendement)
+            batterie_id = row[0]
+            capacite_theo = row[1] if row[1] is not None else 0
+            rendement = row[3] if row[3] is not None else 100.0
             
-            # Classification par nom
-            if "panneau" in resource_nom.lower():
-                panneaux_options.append(label)
-            elif "batterie" in resource_nom.lower():
-                batteries_options.append(label)
+            label = f"{batterie_id} - Batterie (théo: {capacite_theo}Wh, rend: {rendement:.0f}%)"
+            batteries_options.append(label)
         
         # Mettre à jour les dropdowns
         self.combo_calc_panneau["values"] = panneaux_options
@@ -978,6 +1069,83 @@ class SolaireGUI:
             self.combo_calc_panneau.current(0)
         if batteries_options:
             self.combo_calc_batterie.current(0)
+
+    def add_batterie(self):
+        if not self._ensure_connected():
+            return
+        
+        try:
+            capacite_theo = self._nullable_float(self.entry_batterie_theo.get())
+            capacite_reelle = self._nullable_float(self.entry_batterie_reelle.get())
+            rendement = self._nullable_float(self.entry_batterie_rendement.get())
+            if rendement is None:
+                rendement = 100.0
+        except ValueError:
+            messagebox.showwarning("Batterie", "Valeurs invalides pour les capacités ou rendement")
+            return
+        
+        batterie = Batterie(
+            rendement=rendement,
+            capaciteTheorique=capacite_theo,
+            capaciteReelle=capacite_reelle
+        )
+        ok = self.batterie_service.save(batterie)
+        if ok:
+            self.refresh_batteries()
+            self.refresh_ressources_combos()
+            # Effacer les champs
+            self.entry_batterie_theo.delete(0, tk.END)
+            self.entry_batterie_reelle.delete(0, tk.END)
+            self.entry_batterie_rendement.delete(0, tk.END)
+            self.entry_batterie_rendement.insert(0, "100")
+            self.entry_batterie_id.delete(0, tk.END)
+            messagebox.showinfo("Batterie", "Batterie enregistrée")
+        else:
+            messagebox.showerror("Batterie", "Erreur lors de l'enregistrement")
+
+    def update_batterie(self):
+        if not self._ensure_connected():
+            return
+        
+        id_str = self.entry_batterie_id.get().strip()
+        if not id_str:
+            messagebox.showwarning("Batterie", "Veuillez entrer l'ID de la batterie à modifier")
+            return
+        
+        try:
+            batterie_id = int(id_str)
+            capacite_theo = self._nullable_float(self.entry_batterie_theo.get())
+            capacite_reelle = self._nullable_float(self.entry_batterie_reelle.get())
+            rendement = self._nullable_float(self.entry_batterie_rendement.get())
+        except ValueError:
+            messagebox.showwarning("Batterie", "Valeurs invalides pour l'ID ou capacités")
+            return
+        
+        ok = self.batterie_service.update(
+            batterie_id,
+            capaciteTheorique=capacite_theo,
+            capaciteReelle=capacite_reelle,
+            rendement=rendement
+        )
+        if ok:
+            self.refresh_batteries()
+            self.refresh_ressources_combos()
+            messagebox.showinfo("Batterie", "Batterie mise à jour")
+        else:
+            messagebox.showerror("Batterie", "Erreur lors de la mise à jour")
+
+    def refresh_batteries(self):
+        if not self._ensure_connected():
+            return
+        self._clear_tree(self.tree_batteries)
+        rows = self.batterie_service.findAll() or []
+        for row in rows:
+            # row: (id, capaciteTheorique, capaciteReelle, rendement)
+            self.tree_batteries.insert(
+                "",
+                tk.END,
+                values=(row[0], row[1] or "-", row[2] or "-", f"{row[3]:.1f}" if row[3] is not None else "-")
+            )
 
     def add_charge_if_missing(self):
         if not self._ensure_connected():
@@ -1066,26 +1234,27 @@ class SolaireGUI:
             messagebox.showwarning("Calcul", "Veuillez sélectionner une ressource panneau et batterie")
             return
         
-        # Extraire les IDs et les rendements (format: "ID - nom (rendement%)")
+        # Extraire les IDs
         try:
             id_panneau_sel = int(selected_panneau_text.split(" - ")[0])
-            rendement_str = selected_panneau_text.split("(")[1].split("%")[0]
-            rendement_panneau_sel = float(rendement_str)
-            
             id_batterie_sel = int(selected_batterie_text.split(" - ")[0])
-            rendement_str_bat = selected_batterie_text.split("(")[1].split("%")[0]
-            rendement_batterie_sel = float(rendement_str_bat)
         except (ValueError, IndexError):
             messagebox.showerror("Calcul", "Erreur lors du parsing des ressources sélectionnées")
             return
         
         # Récupérer les données complètes des ressources sélectionnées
         ressource_panneau = self.ressource_service.findById(id_panneau_sel)
-        ressource_batterie = self.ressource_service.findById(id_batterie_sel)
+        ressource_batterie = self.batterie_service.findById(id_batterie_sel)
         
         if not ressource_panneau or not ressource_batterie:
             messagebox.showerror("Calcul", "Ressource sélectionnée introuvable dans la base de données")
             return
+        
+        # Extraire les rendements et puissances
+        # ressource_panneau: (id, nom, puissanceTheorique, puissanceReelle, rendement) - tuple
+        # ressource_batterie: objet Batterie avec attributs
+        rendement_panneau_sel = float(ressource_panneau[4]) if ressource_panneau[4] is not None else 100.0
+        rendement_batterie_sel = float(ressource_batterie.rendement) if ressource_batterie.rendement is not None else 100.0
 
         consommations = self._read_consommations_as_models()
         if not consommations:
@@ -1210,11 +1379,10 @@ class SolaireGUI:
         
         # Ressources: Mettre à jour les ressources sélectionnées avec les puissances calculées
         # Batterie
-        self.ressource_service.update(
+        self.batterie_service.update(
             id_batterie_sel,
-            nom=ressource_batterie[1],  # Garder le nom existant
-            puissanceTheorique=batterie_reelle,
-            puissanceReelle=batterie_nuit,
+            capaciteTheorique=batterie_reelle,
+            capaciteReelle=batterie_nuit,
             rendement=rendement_batterie_sel
         )
         
@@ -1228,6 +1396,7 @@ class SolaireGUI:
         )
         
         self.refresh_ressources()
+        self.refresh_batteries()
         self.refresh_charges()
         
         # Affichage avec meilleur formatage
