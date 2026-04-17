@@ -1,0 +1,40 @@
+Bon j'ai besoin que tu me fasse une interface en tkinter , où je peux introduire les materiels avec leur consommations respectifs , attribue à un package specifique tous ce qui est backend . MAIS , 
+en bas de cette phrase je veux que tu me donne le workflow du code que tu vas génerer . De même pour tous les futures prompt . 
+
+==================== WORKFLOW DU CODE ====================
+
+🔄 ARCHITECTURE GLOBALE:
+├── Backend (déjà existant)
+│   ├── Models/ → Définition des structures (Materiel, Consommation, etc.)
+│   ├── Services/ → Logique métier (MaterielService, ConsommationService)
+│   ├── Repositories/ → Accès aux données (MaterielRepository, ConsommationRepository)
+│   └── Database/ → Connexion à la BD (Connexion.py)
+│
+└── Frontend (nouveau)
+    └── UI/
+        ├── __init__.py
+        └── materiel_interface.py → Interface tkinter
+
+📊 FLUX DE DONNÉES:
+1. Utilisateur remplit le formulaire (nom, type, puissance) dans l'interface tkinter
+2. Interface appelle MaterielService.create(novo_materiel)
+3. MaterielService utilise MaterielRepository.create()
+4. MaterielRepository utilise Connexion pour enregistrer en BD
+5. Réponse remonte jusqu'à l'interface → Affichage mis à jour
+
+🎯 FONCTIONNALITÉS IMPLÉMENTÉES:
+✓ Ajouter un matériel avec puissance/consommation
+✓ Afficher la liste des matériels dans un tableau
+✓ Modifier un matériel existant
+✓ Supprimer un matériel
+✓ Calculer et afficher la puissance totale
+✓ Valider les entrées utilisateur
+✓ Gestion des erreurs
+
+🔌 CONNEXIONS UTILISÉES:
+- MaterielService (existing) → Opérations sur matériels
+- ConsommationService (existing) → Gestion des consommations
+- Modèles existants (Materiel, Consommation)
+
+🚀 COMMENT LANCER:
+python UI/materiel_interface.py
